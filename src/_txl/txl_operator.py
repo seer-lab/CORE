@@ -18,10 +18,8 @@ import shutil
 import re
 from _evolution import static
 from shutil import ignore_patterns
-
 sys.path.append("..")  # To allow importing parent directory module
 import config
-
 import logging
 logger = logging.getLogger('arc')
 # Send2Trash from https://pypi.python.org/pypi/Send2Trash

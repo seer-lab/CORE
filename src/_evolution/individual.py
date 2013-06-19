@@ -10,11 +10,10 @@ Copyright David Kelk and Kevin Jalbert, 2012
 
 from _txl import txl_operator
 import sys
-
 sys.path.append("..")  # To allow importing parent directory module
 import config
-
 import logging
+
 logger = logging.getLogger('arc')
 
 class Individual():

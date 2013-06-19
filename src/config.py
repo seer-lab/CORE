@@ -7,7 +7,7 @@ variables that are set in this file and are used all throughout ARC.
 import logging
 
 # System variables
-_ROOT_DIR = "/Users/kelk/workspace/arc/"
+_ROOT_DIR = "/Users/kelk/workspace/CORE/"
 _MAX_MEMORY_MB = 2000
 _MAX_CORES = 2
 _TMP_DIR = _ROOT_DIR + "tmp/"
@@ -30,7 +30,6 @@ _PROJECT_DIR = _ROOT_DIR + "workarea/"
 _PROJECT_SRC_DIR = _PROJECT_DIR + "source/"
 _PROJECT_TEST_DIR = _PROJECT_DIR + "test/"
 _PROJECT_CLASS_DIR = _PROJECT_DIR + "class/"
-_SHARED_VARS_FILE = _PROJECT_DIR + "com_ibm_contest/sharedVars.txt"
 
 # A fixed project (if found) is placed in the output directory
 _PROJECT_OUTPUT_DIR = _ROOT_DIR + "output/"
@@ -41,7 +40,13 @@ _PROJECT_TEST = "test"
 _PROJECT_CLASSPATH = None  # Automatically acquired using ant test if None
 _PROJECT_TEST_MB = 2000
 
-# Chord variables
+# JPF variables
+_JPF_DIR = _ROOT_DIR + "lib/JPF/"
+_JPF_SEARCH_ARRAYS = False
+
+
+# Chord variables - static analysis to find classes, methods and variables
+# used concurrently
 _CHORD_MAIN = "Main"
 _CHORD_COMMAND_LINE_ARGS = "out.txt little"
 
@@ -49,14 +54,15 @@ _CHORD_DIR = _ROOT_DIR + "lib/Chord/"
 _CHORD_PROPERTIES = _CHORD_DIR + "chord.properties"
 _CHORD_JAR = _CHORD_DIR + "chord.jar"
 
-# ConTest variables
+# ConTest variables - keep these for finding shared classes and variables
 _CONTEST_DIR = _ROOT_DIR + "lib/ConTest/"
 _CONTEST_KINGPROPERTY = _CONTEST_DIR + "KingProperties"
+_SHARED_VARS_FILE = _PROJECT_DIR + "com_ibm_contest/sharedVars.txt"
 _CONTEST_JAR = _CONTEST_DIR + "ConTest.jar"
 _CONTEST_RUNS = 10
-_CONTEST_TIMEOUT_SEC = 300 # Default timeout, it is adjusted dynamically
-_CONTEST_TIMEOUT_MULTIPLIER = 20  # The average execution time (with conTest) is multiplied by this
-_CONTEST_VALIDATION_MULTIPLIER = 15  # Allows for validation of functionality
+#_CONTEST_TIMEOUT_SEC = 300 # Default timeout, it is adjusted dynamically
+#_CONTEST_TIMEOUT_MULTIPLIER = 20  # The average execution time (with conTest) is multiplied by this
+#_CONTEST_VALIDATION_MULTIPLIER = 15  # Allows for validation of functionality
 
 # Mutation operator variables
 # [0]Name  [1]Enable  [2]Enable for DataRace  [3]Enable for Deadlock  [4]File

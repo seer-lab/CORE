@@ -22,7 +22,6 @@ import fileinput
 import sys
 import urllib2
 from bs4 import BeautifulSoup
-
 import logging
 logger = logging.getLogger('arc')
 

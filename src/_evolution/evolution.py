@@ -12,15 +12,14 @@ import math
 import traceback
 import copy
 from collections import Counter
-
 sys.path.append("..")  # To allow importing parent directory module
 import config
 from _contest import tester
 from _txl import txl_operator
 import hashlist
 import static
-
 import logging
+
 logger = logging.getLogger('arc')
 
 # Set random's seed
