@@ -29,7 +29,7 @@ import logging
 logger = logging.getLogger('arc')
 
 def main():
-  """The entry point to ARC, to start the evolutionary approach."""
+  """The entry point to CORE, to start the evolutionary approach."""
 
   restart = False
   # 1. Set config._ROOT_DIR - as it is needed by everything!

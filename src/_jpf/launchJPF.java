@@ -1,11 +1,16 @@
-import gov.nasa.jpf.*;
-import gov.nasa.jpf.listener.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.*;
+
+// jpf libraries are in lib/JPF/
+import gov.nasa.jpf.*;
+import gov.nasa.jpf.listener.*;
+
+// py4j is a python package for connecting to Java programs
+import py4j.*;
 
 /* TODO
-  - All info to run jpf is in config.py. See below for reasoning
-  - Understand and implement logging
+  - Understand and implement JPF (and py4j?) logging
 
 */
 
@@ -25,18 +30,18 @@ public class launchJPF {
     jpfHasRun = false;
   }
 
-  public void runJPF() {
-    try {
-      jpfHasRun = false;
+  public void setArgs(String[] inArgs) {
+    args = inArgs;
+  }
 
-      /*  args contains a number of pieces of information
-      +jpf.basedir = config._JPF_DIR
-      +classpath = config._PROJECT_CLASS_DIR
-      +sourcepath = config._PROJECT_SRC_DIR
-      target = config._CHORD_MAIN
-      target_args = config._CHORD_COMMAND_LINE
-      cg.threads.break_arrays = config._JPF_SEARCH_ARRAYS
-       */
+  public void runJPF() {
+    if (args == null) {
+      System.out.println("launchJPF.java, runJPF: Set args before calling runJPF.");
+      return;
+    }
+    jpfHasRun = false;
+
+    try {
       conf = JPF.createConfig(args);
 
       conf.setProperty("search.class", "gov.nasa.jpf.search.heuristic.Interleaving");
@@ -66,6 +71,9 @@ public class launchJPF {
         System.out.println("Race detector error message: "
           + jpfRaceDetector.getErrorMessage());
         // TODO: Deadlock error message
+
+
+
       }
 
     } catch (JPFConfigException cx) {
@@ -82,13 +90,18 @@ public class launchJPF {
     System.out.println("CORE invocation of JPF ended.");
   } // RunJPF
 
+
+  public void resetJPF() {
+    jpfHasRun = false;
+  }
+
   public Boolean hasJPFRun() {
     return jpfHasRun;
   }
 
   public String getDataRaceErrorMessage() {
     if (!jpfHasRun)
-      return "Error, JPF analysis hasn't been performed yet.";
+      return null;
 
     if (jpf.foundErrors())
       return jpfRaceDetector.getErrorMessage();
@@ -98,7 +111,7 @@ public class launchJPF {
 
   public String getDeadlockErrorMessage() {
     if (!jpfHasRun)
-      return "Error, JPF analysis hasn't been performed yet.";
+      return null;
 
     //if (jpf.foundErrors())
     // TODO: I'm not sure how to get the deadlock error message.
@@ -106,10 +119,36 @@ public class launchJPF {
     return null;
   }
 
-  public static void main(String[] args) {
-    launchJPF gogoJPF;
-    gogoJPF = new launchJPF(args);
-    gogoJPF.runJPF();
+  public launchJPF getJPFInstance() {
+    return this;
+  }
 
+  public int getErrorCount() {
+    if (jpfHasRun)
+      return jpf.getSearch().getErrors().size();
+    else
+      return 0;
+  }
+
+  public String getErrorDescription(int i) {
+    if (jpfHasRun)
+      return jpf.getSearch().getErrors().get(i).getDescription();
+    else
+      return null;
+  }
+
+  public String getErrorDetails(int i) {
+    if (jpfHasRun)
+      return jpf.getSearch().getErrors().get(i).getDetails();
+    else
+      return null;
+  }
+
+  public static void main(String[] args) {
+    launchJPF gogoJPF = new launchJPF(args);
+
+    // py4j part
+    GatewayServer server = new GatewayServer(gogoJPF);
+    server.start();
   } // main
 } // class
