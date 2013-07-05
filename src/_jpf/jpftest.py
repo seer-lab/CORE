@@ -37,29 +37,18 @@ def runJPF():
 
   # Run src/_jpf/launchJPF.java
   process = subprocess.Popen(['java', '-Xmx{}m'.format(config._PROJECT_TEST_MB),
-    '-cp', ".:" +config._JPF_JAR + ":" + config._PY4J_JAR, 'launchJPF'],
+    '-cp', ".:" + config._JPF_JAR + ":" + config._PY4J_JAR, 'launchJPF'],
     stdout=outFile, stderr=errFile, cwd=config._JPF_DIR, shell=False)
   time.sleep(2)
-
-  outFile.seek(0)
-  errFile.seek(0)
-  output = outFile.read()
-  error = errFile.read()
-  outFile.close()
-  errFile.close()
-  logger.debug("Open gateway, Output text:\n")
-  logger.debug(output)
-  logger.debug("Open gateway, Error text:\n")
-  logger.debug(error)
 
   # Step 1: Create the gateway to the java program and connect to it
 
   # auto_convert automatically converts python lists to java lists
   gateway = JavaGateway(auto_convert=True)
 
-  jpfLogger = logging.getLogger("py4j")
-  jpfLogger.setLevel(logging.DEBUG)
-  jpfLogger.addHandler(logging.StreamHandler())
+  #jpfLogger = logging.getLogger("py4j")
+  #jpfLogger.setLevel(logging.DEBUG)
+  #jpfLogger.addHandler(logging.StreamHandler())
 
   jpfLauncher = gateway.entry_point.getJPFInstance()
 
@@ -81,6 +70,18 @@ def runJPF():
   jpfLauncher.setArgs(jpfConfig)
   jpfLauncher.runJPF()
 
+  # Debugging
+  outFile.seek(0)
+  errFile.seek(0)
+  output = outFile.read()
+  error = errFile.read()
+  outFile.close()
+  errFile.close()
+  logger.debug("JPF Run, Output text:\n")
+  logger.debug(output)
+  logger.debug("JPF Run, Error text:\n")
+  logger.debug(error)
+
   while jpfLauncher.hasJPFRun() == False:
      time.sleep(1)
 
@@ -88,24 +89,32 @@ def runJPF():
 
   resDataRace = jpfLauncher.getDataRaceErrorMessage()
   if resDataRace <> None:
-    print("DataRace Results: " + resDataRace)
+    logger.debug("DataRace Results: " + resDataRace)
 
-  resDeadlock = jpfLauncher.getDeadlockErrorMessage()
-  if resDeadlock <> None:
-    print("Deadlock Results: " + resDeadlock)
-
-  # Get the more generic error messages
-  #List<gov.nasa.jpf.Error>  jpfErr = jpf.getSearch().getErrors();
-  #  System.out.println("Description:");
-  #  System.out.println(jpfErr.get(0).getDescription());
-  #  System.out.println("Details:");
-  #  System.out.println(jpfErr.get(0).getDetails());
+  resDeadlock = ''
   if jpfLauncher.getErrorCount() > 0:
     for i in (0, jpfLauncher.getErrorCount() - 1):
-      print("Error " + str(i) + " Description:")
-      print(jpfLauncher.getErrorDescription(i))
-      print("Error " + str(i) + " Details:")
-      print(jpfLauncher.getErrorDetails(i))
+      if "NotDeadlockedProperty" in jpfLauncher.getErrorDescription(i):
+        if not jpfLauncher.getErrorDescription(i) in resDeadlock:
+          resDeadlock += " "
+          resDeadlock += jpfLauncher.getErrorDescription(i)
+        if not jpfLauncher.getErrorDetails(i) in resDeadlock:
+          resDeadlock += " "
+          resDeadlock += jpfLauncher.getErrorDetails(i)
+
+  # Friday afternoon coding. the java string concatenation doesn't work
+  #resDeadlock = jpfLauncher.getDeadlockErrorMessage()
+
+  if resDeadlock <> None:
+    logger.debug("Deadlock Results: " + resDeadlock)
+
+  # Debugging
+  #if jpfLauncher.getErrorCount() > 0:
+  #  for i in (0, jpfLauncher.getErrorCount() - 1):
+  #    logger.debug("Error " + str(i) + " Description:")
+  #    logger.debug(jpfLauncher.getErrorDescription(i))
+  #    logger.debug("Error " + str(i) + " Details:")
+  #    logger.debug(jpfLauncher.getErrorDetails(i))
 
   # Step 5: Shut down the py4j server
 
@@ -117,10 +126,10 @@ def runJPF():
 def analyzeJPFRace(jpfRaceStr):
   """When JPF detects a datarace, the message looks similar to this
 
-   Thread-1 at Account.depsite(Account.java:7)
-     "//constructor"  : putfield
-   Thread-5 at Account.transfer(Account.java:12)
-     "//functions"  : getfield
+  Thread-1 at Account.transfer(pc 17)
+   : putfield
+  Thread-2 at Account.depsite(pc 2)
+   : getfield
 
   returns a list of (class, method) tuples
   eg: [(Account, depsite)]
@@ -137,7 +146,7 @@ def analyzeJPFRace(jpfRaceStr):
 
   # Look for class.method
   for i in range(1, 3):
-    race = re.search("(\S+)\.(\S+)\((\S+)\.(\S+)\:", jpfRaceStr)
+    race = re.search("(\S+)\.(\S+)\((\S+)", jpfRaceStr)
     if race is not None:
       aClass = race.group(1)
       aMeth = race.group(2)
@@ -146,21 +155,62 @@ def analyzeJPFRace(jpfRaceStr):
         raceTuples.append(aTuple)
 
     # Remove the class.method that was just found from the string
-    if ("//" in jpfRaceStr):
-      jpfRaceStr =  jpfRaceStr.split("//")[1]
+    if ("Thread-2" in jpfRaceStr):
+      jpfRaceStr =  jpfRaceStr.split("Thread-2")[1]
 
   return raceTuples
 
 # TODO: Implement deadlock analysis fn
 
-#def analyzeJPFDeadlock(jpfDeadlockStr):
+def analyzeJPFDeadlock(jpfDeadlockStr):
+  """When JPF detects a deadlock, the error message looks like
 
+  gov.nasa.jpf.vm.NotDeadlockedProperty
+  Error 0 Details:
+  deadlock encountered:
+  thread DiningPhil$Philosopher:{id:1,name:Thread-1,status:BLOCKED,priority:5,\
+    lockCount:0,suspendCount:0}
+  thread DiningPhil$Philosopher:{id:2,name:Thread-2,status:BLOCKED,priority:5,\
+    lockCount:0,suspendCount:0}
+  """
+
+  logger.debug("jpfDeadlockStr: {}".format(jpfDeadlockStr))
+
+  lockList = []
+
+  if jpfDeadlockStr == None:
+    return lockList
+
+  # < 0 means not found
+  if  jpfDeadlockStr.find("NotDeadlockedProperty") < 0 and jpfDeadlockStr.find("status:BLOCKED") < 0:
+    return lockList
+
+  # Look for classes
+  for i in range(1, 5):
+    lock = re.search("(\S+)\$(\S+):\{", jpfDeadlockStr)
+    if lock is not None:
+      aClass1 = lock.group(1)
+      logger.debug("aClass1    {}".format(aClass1))
+      aClass2 = lock.group(2)
+      logger.debug("aClass2    {}".format(aClass2))
+      if aClass1 not in lockList:
+        lockList.append(aClass1)
+      if aClass2 not in lockList:
+        lockList.append(aClass2)
+
+    # Remove the class.method that was just found from the string
+    if ("suspendCount" in jpfDeadlockStr):
+      jpfDeadlockStr =  jpfDeadlockStr.split("suspendCount")[1]
+      logger.debug("jpfDeadlockStr after split: {}".format(jpfDeadlockStr))
+
+  return lockList
 
 
 
 raceStr, deadStr = runJPF()
-raceList = analyzeJPFRace(raceStr)
-print("Race list:")
-print(raceList)
-print("Deadlock:")
-print(deadStr)
+raceListing = analyzeJPFRace(raceStr)
+lockListing = analyzeJPFDeadlock(deadStr)
+logger.debug("Race list:")
+logger.debug(raceListing)
+logger.debug("Deadlock list:")
+logger.debug(lockListing)

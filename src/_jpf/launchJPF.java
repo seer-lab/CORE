@@ -36,21 +36,24 @@ public class launchJPF {
 
   public void runJPF() {
     if (args == null) {
-      System.out.println("launchJPF.java, runJPF: Set args before calling runJPF.");
+      log.error("launchJPF.java, runJPF: Set args before calling runJPF.");
       return;
     }
     jpfHasRun = false;
 
     try {
+      log.info("Create JPF's config");
       conf = JPF.createConfig(args);
 
-      conf.setProperty("search.class", "gov.nasa.jpf.search.heuristic.Interleaving");
-      conf.setProperty("search.multiple_errors", "false");
+      //conf.setProperty("search.class", "gov.nasa.jpf.search.heuristic.Interleaving");
+      //conf.setProperty("search.multiple_errors", "false");
       //conf.setProperty("", "");
 
+      log.info("Create jpf");
       jpf = new JPF(conf);
 
       // ----- Data-race listener
+      log.info("Data race listener");
       jpfRaceDetector = new PreciseRaceDetector(conf);
       conf.setProperty("report.console.property_violation", "error");
       // Listener needs to be on both lists to work right
@@ -58,36 +61,36 @@ public class launchJPF {
       jpf.addVMListener(jpfRaceDetector);
 
       // ----- Deadlock analyzer
+      log.info("Deadlock analyzer listener");
       jpfDeadlockAn = new DeadlockAnalyzer(conf, jpf);
       conf.setProperty("deadlock.format", "essential");
       jpf.addSearchListener(jpfDeadlockAn);
       jpf.addVMListener(jpfDeadlockAn);
 
+      log.info("jpf.run()");
       jpf.run();
       jpfHasRun = true;
 
+
+      log.info("Check for errors");
       if (jpf.foundErrors()) {
-        // ... process property violations discovered by JPF
-        System.out.println("Race detector error message: "
-          + jpfRaceDetector.getErrorMessage());
-        // TODO: Deadlock error message
-
-
-
+        // Not used ATM
       }
 
     } catch (JPFConfigException cx) {
+      log.severe(cx.toString());
       // ... handle configuration exception
       // ...  can happen before running JPF and indicates inconsistent
       //      configuration data
     } catch (JPFException jx) {
+      log.severe(jx.toString());
       // ... handle exception while executing JPF,
       // ...  JPFListenerException - occurred from within configured listener
       // ...  JPFNativePeerException - occurred from within MJI method/native peer
       // ...  all others indicate JPF internal errors
     } // try-catch
 
-    System.out.println("CORE invocation of JPF ended.");
+    log.info("CORE invocation of JPF ended.");
   } // RunJPF
 
 
@@ -113,10 +116,20 @@ public class launchJPF {
     if (!jpfHasRun)
       return null;
 
-    //if (jpf.foundErrors())
-    // TODO: I'm not sure how to get the deadlock error message.
-    //       It isn't as simple as the data-race one
-    return null;
+    //if (!jpf.foundErrors())
+    //  return null;
+
+    int numErrors = jpf.getSearch().getErrors().size();
+    //if (numErrors == 0)
+    //  return null;
+
+    String errString = "abc";
+    for (int i = 0; i <= numErrors; i++) {
+      errString = errString + jpf.getSearch().getErrors().get(i).getDescription();
+      errString = errString + jpf.getSearch().getErrors().get(i).getDetails();
+    }
+
+    return errString;
   }
 
   public launchJPF getJPFInstance() {
