@@ -36,24 +36,24 @@ public class launchJPF {
 
   public void runJPF() {
     if (args == null) {
-      log.error("launchJPF.java, runJPF: Set args before calling runJPF.");
+      log.info("launchJPF.java, runJPF: Set args before calling runJPF.");
       return;
     }
     jpfHasRun = false;
 
     try {
-      log.info("Create JPF's config");
+      //log.info("Create JPF's config");
       conf = JPF.createConfig(args);
 
       //conf.setProperty("search.class", "gov.nasa.jpf.search.heuristic.Interleaving");
       //conf.setProperty("search.multiple_errors", "false");
       //conf.setProperty("", "");
 
-      log.info("Create jpf");
+      //log.info("Create JPF");
       jpf = new JPF(conf);
 
       // ----- Data-race listener
-      log.info("Data race listener");
+      //log.info("Data race listener");
       jpfRaceDetector = new PreciseRaceDetector(conf);
       conf.setProperty("report.console.property_violation", "error");
       // Listener needs to be on both lists to work right
@@ -61,18 +61,18 @@ public class launchJPF {
       jpf.addVMListener(jpfRaceDetector);
 
       // ----- Deadlock analyzer
-      log.info("Deadlock analyzer listener");
+      //log.info("Deadlock analyzer listener");
       jpfDeadlockAn = new DeadlockAnalyzer(conf, jpf);
       conf.setProperty("deadlock.format", "essential");
       jpf.addSearchListener(jpfDeadlockAn);
       jpf.addVMListener(jpfDeadlockAn);
 
-      log.info("jpf.run()");
+      //log.info("jpf.run()");
       jpf.run();
       jpfHasRun = true;
 
 
-      log.info("Check for errors");
+      //log.info("Check for errors");
       if (jpf.foundErrors()) {
         // Not used ATM
       }
@@ -116,17 +116,19 @@ public class launchJPF {
     if (!jpfHasRun)
       return null;
 
-    //if (!jpf.foundErrors())
-    //  return null;
+    if (!jpf.foundErrors())
+      return null;
 
-    int numErrors = jpf.getSearch().getErrors().size();
-    //if (numErrors == 0)
-    //  return null;
+    int numErrors = getErrorCount();
+    if (numErrors == 0)
+      return null;
 
-    String errString = "abc";
-    for (int i = 0; i <= numErrors; i++) {
-      errString = errString + jpf.getSearch().getErrors().get(i).getDescription();
-      errString = errString + jpf.getSearch().getErrors().get(i).getDetails();
+    String errString = "";
+    for (int i = 0; i < numErrors; i++) {
+      errString += " ";
+      errString += getErrorDescription(i);
+      errString += " ";
+      errString += getErrorDetails(i);
     }
 
     return errString;

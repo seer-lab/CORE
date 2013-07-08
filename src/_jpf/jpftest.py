@@ -21,7 +21,7 @@ logger = logging.getLogger('arc')
 
 
 def runJPF():
-  # Step 0: Compile and run the JPF gateway
+  # Step 0: Compile and run the Java end of the gatewaay
 
   outFile = tempfile.SpooledTemporaryFile()
   errFile = tempfile.SpooledTemporaryFile()
@@ -41,23 +41,16 @@ def runJPF():
     stdout=outFile, stderr=errFile, cwd=config._JPF_DIR, shell=False)
   time.sleep(2)
 
-  # Step 1: Create the gateway to the java program and connect to it
+  # Step 1: Create the local part of the gateway and connect to the
+  #         Java end
 
   # auto_convert automatically converts python lists to java lists
   gateway = JavaGateway(auto_convert=True)
 
-  #jpfLogger = logging.getLogger("py4j")
-  #jpfLogger.setLevel(logging.DEBUG)
-  #jpfLogger.addHandler(logging.StreamHandler())
-
   jpfLauncher = gateway.entry_point.getJPFInstance()
 
-  # Step 2: Create the necessary lists of configuration information for
-  #         both py4j (to connect to launchJPF.java) and for the JPF
-  #         project being run.
-
-  # Create list of strings for configuring JPF
-  # Note that we are creating a Java array, not a Python list
+  # Step 2: Create the configuration list for JPF. Note that we are
+  #         creating a Java array (of Strings), not a Python list
 
   jpfConfig = gateway.new_array(gateway.jvm.java.lang.String, 3)
   jpfConfig[0] = config._JPF_CONFIG
@@ -82,31 +75,9 @@ def runJPF():
   logger.debug("JPF Run, Error text:\n")
   logger.debug(error)
 
+  # Wait for JPF to complete
   while jpfLauncher.hasJPFRun() == False:
      time.sleep(1)
-
-  # Step 4: Get the results of the JPF run
-
-  resDataRace = jpfLauncher.getDataRaceErrorMessage()
-  if resDataRace <> None:
-    logger.debug("DataRace Results: " + resDataRace)
-
-  resDeadlock = ''
-  if jpfLauncher.getErrorCount() > 0:
-    for i in (0, jpfLauncher.getErrorCount() - 1):
-      if "NotDeadlockedProperty" in jpfLauncher.getErrorDescription(i):
-        if not jpfLauncher.getErrorDescription(i) in resDeadlock:
-          resDeadlock += " "
-          resDeadlock += jpfLauncher.getErrorDescription(i)
-        if not jpfLauncher.getErrorDetails(i) in resDeadlock:
-          resDeadlock += " "
-          resDeadlock += jpfLauncher.getErrorDetails(i)
-
-  # Friday afternoon coding. the java string concatenation doesn't work
-  #resDeadlock = jpfLauncher.getDeadlockErrorMessage()
-
-  if resDeadlock <> None:
-    logger.debug("Deadlock Results: " + resDeadlock)
 
   # Debugging
   #if jpfLauncher.getErrorCount() > 0:
@@ -116,7 +87,17 @@ def runJPF():
   #    logger.debug("Error " + str(i) + " Details:")
   #    logger.debug(jpfLauncher.getErrorDetails(i))
 
-  # Step 5: Shut down the py4j server
+  # Step 4: Get the results of the JPF run
+
+  resDataRace = jpfLauncher.getDataRaceErrorMessage()
+  #logger.debug("Raw DataRace Results:")
+  #logger.debug(resDataRace)
+
+  resDeadlock = jpfLauncher.getDeadlockErrorMessage()
+  #logger.debug("Raw Deadlock Results:")
+  #logger.debug(resDeadlock)
+
+  # Step 5: Shut down the py4j server and return results for processing
 
   gateway.shutdown()
 
@@ -155,12 +136,11 @@ def analyzeJPFRace(jpfRaceStr):
         raceTuples.append(aTuple)
 
     # Remove the class.method that was just found from the string
-    if ("Thread-2" in jpfRaceStr):
-      jpfRaceStr =  jpfRaceStr.split("Thread-2")[1]
+    if ("Thread-" in jpfRaceStr):
+      jpfRaceStr =  jpfRaceStr.split("Thread-",1)[1]
 
   return raceTuples
 
-# TODO: Implement deadlock analysis fn
 
 def analyzeJPFDeadlock(jpfDeadlockStr):
   """When JPF detects a deadlock, the error message looks like
@@ -174,7 +154,7 @@ def analyzeJPFDeadlock(jpfDeadlockStr):
     lockCount:0,suspendCount:0}
   """
 
-  logger.debug("jpfDeadlockStr: {}".format(jpfDeadlockStr))
+  #logger.debug("jpfDeadlockStr: {}".format(jpfDeadlockStr))
 
   lockList = []
 
@@ -190,9 +170,9 @@ def analyzeJPFDeadlock(jpfDeadlockStr):
     lock = re.search("(\S+)\$(\S+):\{", jpfDeadlockStr)
     if lock is not None:
       aClass1 = lock.group(1)
-      logger.debug("aClass1    {}".format(aClass1))
+      #logger.debug("aClass1    {}".format(aClass1))
       aClass2 = lock.group(2)
-      logger.debug("aClass2    {}".format(aClass2))
+      #logger.debug("aClass2    {}".format(aClass2))
       if aClass1 not in lockList:
         lockList.append(aClass1)
       if aClass2 not in lockList:
@@ -200,8 +180,8 @@ def analyzeJPFDeadlock(jpfDeadlockStr):
 
     # Remove the class.method that was just found from the string
     if ("suspendCount" in jpfDeadlockStr):
-      jpfDeadlockStr =  jpfDeadlockStr.split("suspendCount")[1]
-      logger.debug("jpfDeadlockStr after split: {}".format(jpfDeadlockStr))
+      jpfDeadlockStr =  jpfDeadlockStr.split("suspendCount",1)[1]
+      #logger.debug("jpfDeadlockStr after split: {}".format(jpfDeadlockStr))
 
   return lockList
 
@@ -210,7 +190,7 @@ def analyzeJPFDeadlock(jpfDeadlockStr):
 raceStr, deadStr = runJPF()
 raceListing = analyzeJPFRace(raceStr)
 lockListing = analyzeJPFDeadlock(deadStr)
-logger.debug("Race list:")
+logger.debug("*** Race list:")
 logger.debug(raceListing)
-logger.debug("Deadlock list:")
+logger.debug("*** Deadlock list:")
 logger.debug(lockListing)
