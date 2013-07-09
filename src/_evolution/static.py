@@ -23,7 +23,7 @@ import sys
 import urllib2
 from bs4 import BeautifulSoup
 import logging
-logger = logging.getLogger('arc')
+logger = logging.getLogger('core')
 
 # We get two kinds of output from Chord's static analysis:
 
@@ -106,14 +106,14 @@ def run_chord_datarace():
 
 
 def did_chord_find_dataraces():
-  # arc/workarea/chord_output
+  # core/workarea/chord_output
   chordOutDir = os.path.join(config._PROJECT_DIR, 'chord_output')
 
   if not os.path.exists(chordOutDir):
     logger.error("Chord output directory, {}, not found".format(chordOutDir))
     return False
 
-  # arc/workarea/chord_output/dataraces_by_fld.html
+  # core/workarea/chord_output/dataraces_by_fld.html
   URL = os.path.join(chordOutDir, 'dataraces_by_fld.html')
 
   if not os.path.isfile(URL):

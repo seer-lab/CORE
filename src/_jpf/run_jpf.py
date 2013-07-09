@@ -17,7 +17,7 @@ import re
 import time
 
 import logging
-logger = logging.getLogger('arc')
+logger = logging.getLogger('core')
 
 
 def runJPF():
@@ -186,11 +186,13 @@ def analyzeJPFDeadlock(jpfDeadlockStr):
   return lockList
 
 
+# Testing
+# -----------------------------------------
 
-raceStr, deadStr = runJPF()
-raceListing = analyzeJPFRace(raceStr)
-lockListing = analyzeJPFDeadlock(deadStr)
-logger.debug("*** Race list:")
-logger.debug(raceListing)
-logger.debug("*** Deadlock list:")
-logger.debug(lockListing)
+# raceStr, deadStr = runJPF()
+# raceListing = analyzeJPFRace(raceStr)
+# lockListing = analyzeJPFDeadlock(deadStr)
+# logger.debug("*** Race list:")
+# logger.debug(raceListing)
+# logger.debug("*** Deadlock list:")
+# logger.debug(lockListing)

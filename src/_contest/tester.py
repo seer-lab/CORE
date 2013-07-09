@@ -3,8 +3,8 @@
 The Tester class will run a testsuite using ConTest to introduce random thread
 sleep() and yeild() into the executing testsuite.
 
-Copyright David Kelk and Kevin Jalbert, 2012
-          David Kelk, 2013
+Copyright ARC, David Kelk and Kevin Jalbert, 2012
+          ARC, CORE, David Kelk, 2013
 """
 
 from __future__ import division
@@ -21,7 +21,7 @@ sys.path.append("..")  # To allow importing parent directory module
 import config
 
 import logging
-logger = logging.getLogger('arc')
+logger = logging.getLogger('core')
 
 
 class Tester():

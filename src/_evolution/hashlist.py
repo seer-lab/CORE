@@ -14,7 +14,7 @@ import logging
 import hashlib
 import shutil
 
-logger = logging.getLogger('arc')
+logger = logging.getLogger('core')
 
 # A dictionary to hold the path of unique mutations by individual's and
 # generation. The mapping is:
@@ -52,7 +52,7 @@ def find_hash(newHash):
   if prevSeenMutantProj.has_key(newHash):
     return prevSeenMutantProj[(newHash)]
   else:
-    return (-1, -1)
+    return (None, None)
 
 
 

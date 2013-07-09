@@ -1,11 +1,11 @@
-"""This module holds the 2D variable binary string genome used in ARC.
+"""This module holds the 2D variable binary string genome used in CORE.
 
 This genome is based off of a classic 2D binary string representation, but has
 the capabilities to have a variable width for each row. In addition, there are
-specific attributes used in the ARC evolutionary process.
+specific attributes used in the CORE evolutionary process.
 
-Copyright David Kelk and Kevin Jalbert, 2012
-          David Kelk, 2013
+Copyright ARC, David Kelk and Kevin Jalbert, 2012
+          ARC, CORE, David Kelk, 2013
 """
 
 from _txl import txl_operator
@@ -14,12 +14,12 @@ sys.path.append("..")  # To allow importing parent directory module
 import config
 import logging
 
-logger = logging.getLogger('arc')
+logger = logging.getLogger('core')
 
 class Individual():
   """A 2D binary string that has a variable width for each row.
 
-  Additionally, there exists attributes related to ARC evolution.
+  Additionally, there exists attributes related to CORE evolution.
 
   Attributes:
   height (int): number of mutation operators used, also the number of rows

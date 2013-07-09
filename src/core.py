@@ -1,10 +1,9 @@
-"""This module is responsible for starting the Automatic Concurrency Repair.
+"""This module is responsible for starting CORE (COncurrent REpair).
 
-The entry point for ARC is found in this module. The configurations are held
-within the config.py module.
+Configurations are held within the config.py module.
 
-Copyright David Kelk and Kevin Jalbert, 2012
-          David Kelk, 2013
+Copyright ARC, David Kelk and Kevin Jalbert, 2012
+          ARC, CORE, David Kelk, 2013
 """
 
 import config
@@ -20,13 +19,14 @@ from _contest import contester
 from _evolution import evolution
 from _txl import txl_operator
 from _evolution import static
+#from _jpf import run_jpf
 import fileinput
 # Send2Trash from https://pypi.python.org/pypi/Send2Trash
 # Details on its use is in step 9 below
 from send2trash import send2trash
 
 import logging
-logger = logging.getLogger('arc')
+logger = logging.getLogger('core')
 
 def main():
   """The entry point to CORE, to start the evolutionary approach."""
@@ -123,8 +123,8 @@ def main():
     outFile.close()
 
     # If you are getting an error at the re.search below, make sure the ant
-    # build file has the following sections. _PROJECT_PRISTINE_SRC_DIR and
-    # related entries in config.py have to agree with what is in the ant file:
+    # build file (build.xml) has the following sections. _PROJECT_PRISTINE_SRC_DIR
+    # and related entries in config.py have to agree with what is in the ant file:
 
     # <path id="classpath.base">
     #   <pathelement location="${current}" />
@@ -193,10 +193,10 @@ if __name__ == '__main__':
 
   # Define the argument options to be parsed
   parser = argparse.ArgumentParser(
-    description="ARC: Automatically Repair Concurrency bugs in Java "\
-                  "<https://github.com/sqrg-uoit/arc>",
-    version="ARC 0.2.0",
-    usage="python arc.py")
+    description="CORE: Concurrent Repair of Java Programs "\
+                  "<https://github.com/sqrg-uoit/core>",
+    version="CORE 0.1.0",
+    usage="python core.py")
 
   # Parse the arguments passed from the shell
   options = parser.parse_args()

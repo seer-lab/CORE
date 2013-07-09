@@ -6,6 +6,9 @@
 - Copying local projects to the work area
 - Compiling work area projects
 - Copying a correct project to the output directory
+
+Copyright ARC, David Kelk and Kevin Jalbert, 2012
+          ARC, CORE, David Kelk, 2013
 """
 
 import sys
@@ -21,16 +24,16 @@ from shutil import ignore_patterns
 sys.path.append("..")  # To allow importing parent directory module
 import config
 import logging
-logger = logging.getLogger('arc')
+logger = logging.getLogger('core')
 # Send2Trash from https://pypi.python.org/pypi/Send2Trash
-# See arc.py for more details
+# See core.py for more details
 from send2trash import send2trash
 
 # A dictionary to hold the path of unique mutations by individual's and
 # generation. The mapping is:
 # (generation, memberNum, txlOperator, mutantNum) => mutant file
 # For example:
-# (2 4 EXCR 6) -> /home/myrikhan/workspace/arc/tmp/2/4/source/DeadlockDemo
+# (2 4 EXCR 6) -> /users/kelk/workspace/core/tmp/2/4/source/DeadlockDemo
 #                 /EXCR/EXCR_DeadlockDemo_1.java_3
 uniqueMutants = {}
 
@@ -125,7 +128,7 @@ def recursively_mutate_project(generation, memberNum, sourceDir, destDir, mutati
 
     for aFile in files:
       if ("." in aFile and aFile.split(".")[1] == "java"):
-        # arc/input/source/main/net/sf/cache4j/Cache.java or
+        # core/input/source/main/net/sf/cache4j/Cache.java or
         # tmp/1/3/source/main/net/sf/cache4j/Cache.java
         sourceFile = os.path.join(root, aFile)
 
@@ -135,13 +138,13 @@ def recursively_mutate_project(generation, memberNum, sourceDir, destDir, mutati
 
         # We need to get the relative path of the source file and add it to the
         # destination directory. For example,
-        # IF source dir = arc/input/source/main/net/sf/cache4j/
+        # IF source dir = core/input/source/main/net/sf/cache4j/
         # THEN the rel path = main/net/sf/cache4j/
         if generation == 1:
-          # arc/input/source/
+          # core/input/source/
           subtr = config._PROJECT_PRISTINE_SRC_DIR
         else:
-          # arc/tmp/2/4/project/source/
+          # core/tmp/2/4/project/source/
           subtr = os.path.join(config._TMP_DIR, str(generation - 1), str(memberNum),
                   'project', config._PROJECT_SRC_DIR.replace(config._PROJECT_DIR, ''))
 
@@ -209,7 +212,7 @@ def generate_mutants(generation, memberNum, txlOperator, sourceFile, destDir):
   txlDestDir = os.path.join(destDir, sourceNameOnly, txlOperator[0]) + os.sep
 
   # If the output directory doesn't exist, create it, otherwise clean subdirectories
-  # arc/tmp/1/1/source/BuggedProgram/ASAS/
+  # core/tmp/1/1/source/BuggedProgram/ASAS/
   if os.path.exists(txlDestDir):
     shutil.rmtree(txlDestDir)
   os.makedirs(txlDestDir)
@@ -450,7 +453,7 @@ def recursive_generate_representation(generation, memberNum, recDir, representat
 
         representation[mutationOp[0]] += 1
         # uniqueMutants at {1, 1, ASAT, 1} = /Users/kelk/workspace
-        #  /ARC-Test-Suite/test_area/arc/tmp/1/1/Account/ASAT
+        #  /CORE-Test-Suite/test_area/core/tmp/1/1/Account/ASAT
         #  /ASAT_Account_1.java_1
         #logger.debug("uniqueMutants at {}, {}, {}, {} = {}".format(generation,
         #           memberNum, mutationOp[0], rep[mutationOp[0]],
