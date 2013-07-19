@@ -25,27 +25,43 @@ from bs4 import BeautifulSoup
 import logging
 logger = logging.getLogger('core')
 
+# The targeting of classes, methods and variables for mutation can be
+# improved by finding which ones are used concurrently. There are different
+# tools that can do this - like Chord, a static analysis tool and ConTest,
+# which we use for noising. Different tools return different information -
+# like the Class and variable used concurrently or the class and variable
+# used concurrently.
+# This file contains methods to collect the classes, methods and variables
+# found with the ultimate goal of producing a list of (class, method,
+# variable) (c, m , v) triples.
+# If the (c, m, v) information isn't available, we may still have (c, m)
+# or (c, v) information to work with.
+
+# TODO: Record the results of the static analysis so it doesn't have to
+#       be run every time.
+
+
 # We get two kinds of output from Chord's static analysis:
 
-# 1. class.variable
+# 1. (class, variable) tuples from Chord
 classVar = []
 
-# 2. class.method
+# 2. (class, method) tuples from Chord
 classMeth = []
 
 # In addition we have:
 
-# 3. ConTest list of class.variable
+# 3. ConTest list of (class, variable) tuples
 conTestClassVar = []
 
 # Once we have classVar and conTestClassVar (#s 1 and 3) we can merge them in to one list
 
-# 4. Merged class.variable list from static analysis and ConTest
+# 4. Merged (class, variable) tuple list from static analysis and ConTest
 mergedClassVar = []
 
 # Then we combine #4 and #2 to get the class-method-variable list
 
-# 5. Final class-method-variable list
+# 5. Final (class, method, variable) tuple list
 finalCMV = []
 
 def setup():
@@ -300,3 +316,38 @@ def load_contest_list():
 
   logger.info("Populated class.variable list with ConTest data")
   return True
+
+# ---------------- JPF Related Functions -----------------
+
+def add_JPF_race_list(JPFlist):
+  """Add the new (class, method) tuples discovered by JPF to
+  the list of (class, method) tuples involved in the race or
+  deadlock.
+
+  Arguments:
+    JPFList (List (class, method) tuples): Tuples discovered
+      by JPF
+  """
+
+  for aTuple in JPFlist:
+    if not aTuple in classMeth:
+      classMeth.add(ATuple)
+
+  create_final_triple()
+
+def add_JPF_lock_list(JPFList):
+  """Combine the list of classes involved with the deadlocks
+  discovered by JPF with the methods already found in the
+  classMeth tuples and adds them to classMeth.
+
+  Arguments
+    JPFList (List string): List of classes involved in deadlocks
+  """
+
+  for aItem in JPFList:
+    for aTuple in classMeth:
+      newTuple = (aItem, aTuple[1])
+      if not newTuple in classMeth:
+        classMeth.Add(newTuple)
+
+  create_final_triple()

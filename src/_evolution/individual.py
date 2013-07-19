@@ -66,6 +66,9 @@ class Individual():
 
     self.turnsUnderperforming = 0
 
+    # How the fitness was evaluated: JPF, ConTest, ...
+    self.evalMethod = []
+
   def repopulateGenome(self, functionalPhase):
     """This function will re-populate the genome with location values.
 
@@ -132,9 +135,10 @@ class Individual():
     ret += " Score: {}\n".format(self.score)
     ret += " Restarted: {}\n".format(self.wasRestarted)
     ret += " Replaced: {}\n".format(self.wasReplaced)
-    ret += " stateSpace: {}\n".format(self.stateSpace)
-    ret += " turnsUnderperforming: {}\n".format(self.turnsUnderperforming)
-    ret += " validated: {}\n".format(self.validated)
+    ret += " State Space: {}\n".format(self.stateSpace)
+    ret += " Turns Underperforming: {}\n".format(self.turnsUnderperforming)
+    ret += " Validated: {}\n".format(self.validated)
+    ret += " Evaluation Method: {}\n".format(self.evalMethod)
 
     return ret
 
@@ -159,5 +163,6 @@ class Individual():
     newIndividual.stateSpace = self.stateSpace[:]
     newIndividual.switchGeneration = self.switchGeneration
     newIndividual.turnsUnderperforming = 0
+    newIndividual.evalMethod = self.EvalMethod[:]
 
     return newIndividual
