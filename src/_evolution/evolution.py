@@ -79,7 +79,7 @@ def initialize(bestIndividual=None):
       individual = Individual(mutationOperators, i)
     else:  # Non-functional phase
       logger.debug("Cloning best functional individual {} into individual {}".format(
-                                                          bestIndividual.id, i))
+                   bestIndividual.id, i))
       individual = bestIndividual.clone(mutationOperators, i)
 
     _population.append(individual)
@@ -107,7 +107,7 @@ def start():
     # If so, proceed to phase 2, optimization.
     if bestFunctional.successes[-1]/config._CONTEST_RUNS == 1.0 and bestFunctional.validated:
 
-      # Proceed with the non-functional phase, if enabled
+      # Proceed with the optimization phase, if enabled
       if not config._ONLY_FUNCTIONAL:
 
         _functionalPhase = False
@@ -185,6 +185,9 @@ def start():
     # it is enabled or not
     else:
       logger.info("No individual was found that functions correctly")
+
+    logger.info("Shutting down the Java/JPF side of the bridge")
+    run_jpf.shutdownJPFProcess()
 
     # Debugging
     # logger.info("------------------------------")

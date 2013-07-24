@@ -468,6 +468,7 @@ def recursive_generate_representation(generation, memberNum, recDir, representat
 
   return representation
 
+
 def clean_up_mutants(generation, memberNum):
   """Once a project has been successfully compiled, delete all of the mutants
   for that member. This should help cull the prolem of taking up gigabytes of
@@ -632,9 +633,9 @@ def move_mutant_to_local_project(generation, memberNum, txlOperator, mutantNum):
   if not os.path.exists(destPath):
     os.makedirs(destPath)
 
-  logger.debug("Moving mutant to local project:")
-  logger.debug("  sourceFile: {}".format(sourceFile))
-  logger.debug("  destFile:   {}".format(destFile))
+  #logger.debug("Moving mutant to local project:")
+  #logger.debug("  sourceFile: {}".format(sourceFile))
+  #logger.debug("  destFile:   {}".format(destFile))
 
   shutil.copy(sourceFile, destFile)
 

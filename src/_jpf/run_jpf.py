@@ -22,10 +22,12 @@ logger = logging.getLogger('core')
 # Global variables
 
 jpfLauncher = None
-
+jpfProcess = None
 
 def createGateway():
   # Compile and run the Java end of the gateway
+
+  global jpfProcess
 
   outFile = tempfile.SpooledTemporaryFile()
   errFile = tempfile.SpooledTemporaryFile()
@@ -54,7 +56,7 @@ def createGateway():
 
   logger.debug("Starting the Java side of the bridge.")
   # Run/start src/_jpf/launchJPF.java so we can connect to it throught py4j
-  process3 = subprocess.Popen(['java', '-Xmx{}m'.format(config._PROJECT_TEST_MB),
+  jpfProcess = subprocess.Popen(['java', '-Xmx{}m'.format(config._PROJECT_TEST_MB),
     '-cp', ".:" + config._JPF_JAR + ":" + config._PY4J_JAR, 'launchJPF'],
     stdout=outFile, stderr=errFile, cwd=config._JPF_DIR, shell=False)
   time.sleep(2) # Wouldn't it be ironic if this lead to a data race
@@ -71,6 +73,7 @@ def createGateway():
   logger.debug("JPF Run, Error text:\n")
   logger.debug(error)
 
+
 def runJPF():
   """Create the JPF instance, configure it, invoke it and wait for the
   results.
@@ -85,7 +88,7 @@ def runJPF():
   # Create the local part of the gateway and connect to the Java end
 
   # auto_convert automatically converts python lists to java lists
-  logger.debug("Creating the python side of the bridge.")
+  #logger.debug("Creating the python side of the bridge.")
   pyGateway = JavaGateway(auto_convert=True)
 
   jpfLauncher = pyGateway.entry_point.getJPFInstance()
@@ -113,9 +116,19 @@ def runJPF():
   jpfLauncher.runJPF()
 
   # Wait for JPF to complete
-  logger.debug("Waiting for JPF to complete.")
+  #logger.debug("Waiting for JPF to complete.")
   while jpfLauncher.hasJPFRun() == False:
      time.sleep(1)
+  #logger.debug("JPF finished.")
+
+
+def shutdownJPFProcess():
+
+  global jpfProcess
+
+  jpfProcess.send_signal(3)
+  time.sleep(1)
+  jpfProcess.terminate()
 
 
 def analyzeJPFRace():

@@ -1,11 +1,15 @@
-# ARC generated directories
+# CORE generated directories
 tmp
 project_backup
 input
 output
 workarea
+lib
 
 *.py[co]
+
+# Java
+*.class
 
 # Packages
 *.egg
