@@ -5,9 +5,6 @@ The buggy program requires a <project>.jpf configuration file.
 Copyright David Kelk, 2013
 """
 
-# TODO: Someone with a better knowledge of py4j and sockets should clean up this
-#       code so the starting up and shutting down of the python side and the
-#       Java side of the connection is done correctly. (See shutdownGateway())
 
 # py4j is a library for calling java methods from python
 # http://py4j.sourceforge.net/
@@ -24,23 +21,10 @@ logger = logging.getLogger('core')
 
 # Global variables
 
-pyGateway = None
-javaServer = None
 jpfLauncher = None
 
 
-def runJPF():
-  """Create the JPF instance, configure it, invoke it and wait for the
-  results.
-
-  Returns:
-    No return value
-  """
-
-  global pyGateway
-  global javaServer
-  global jpfLauncher
-
+def createGateway():
   # Compile and run the Java end of the gateway
 
   outFile = tempfile.SpooledTemporaryFile()
@@ -53,11 +37,17 @@ def runJPF():
     stderr=errFile, cwd=config._JPF_DIR, shell=False)
   process.wait()
 
-  # Paranoia: Kill any existing 'Java side of the bridge' instances
-  #           See shutdownGateway() below
-  process2 = subprocess.Popen(['kill', '`lsof -i TCP:25333`'], stdout=outFile,
-    stderr=errFile, cwd=config._JPF_DIR, shell=False)
-  process2.wait()
+  # Debugging
+  outFile.seek(0)
+  errFile.seek(0)
+  output = outFile.read()
+  error = errFile.read()
+  outFile.close()
+  errFile.close()
+  logger.debug("Compile, Output text:\n")
+  logger.debug(output)
+  logger.debug("Compile, Error text:\n")
+  logger.debug(error)
 
   outFile = tempfile.SpooledTemporaryFile()
   errFile = tempfile.SpooledTemporaryFile()
@@ -68,6 +58,29 @@ def runJPF():
     '-cp', ".:" + config._JPF_JAR + ":" + config._PY4J_JAR, 'launchJPF'],
     stdout=outFile, stderr=errFile, cwd=config._JPF_DIR, shell=False)
   time.sleep(2) # Wouldn't it be ironic if this lead to a data race
+
+  # Debugging
+  outFile.seek(0)
+  errFile.seek(0)
+  output = outFile.read()
+  error = errFile.read()
+  outFile.close()
+  errFile.close()
+  logger.debug("JPF Run, Output text:\n")
+  logger.debug(output)
+  logger.debug("JPF Run, Error text:\n")
+  logger.debug(error)
+
+def runJPF():
+  """Create the JPF instance, configure it, invoke it and wait for the
+  results.
+
+  Returns:
+    No return value
+  """
+
+  global jpfLauncher
+
 
   # Create the local part of the gateway and connect to the Java end
 
@@ -99,48 +112,10 @@ def runJPF():
   jpfLauncher.setArgs(jpfConfig)
   jpfLauncher.runJPF()
 
-  # Debugging
-  # outFile.seek(0)
-  # errFile.seek(0)
-  # output = outFile.read()
-  # error = errFile.read()
-  # outFile.close()
-  # errFile.close()
-  # logger.debug("JPF Run, Output text:\n")
-  # logger.debug(output)
-  # logger.debug("JPF Run, Error text:\n")
-  # logger.debug(error)
-
   # Wait for JPF to complete
   logger.debug("Waiting for JPF to complete.")
   while jpfLauncher.hasJPFRun() == False:
      time.sleep(1)
-
-
-def shutdownGateway():
-  """Shut down both the local and remote ends of the py4j connection.
-
-  Returns:
-    No return value
-  """
-
-  global pyGateway
-  global javaServer
-
-  logger.debug("Shutting down the gateway.")
-
-  # Close the remote end/Java side
-  # I've not been able to figure out how to close down the Java side of the
-  # py4j gateway. A command-line way to do so is, kill `lsof -i TCP:25333`.
-  # This kills any process listening on port 25333, the default used by py4j.
-  # Killing the process isn't the right way to do it. Sadly, its the only
-  # way I know how, so far.
-  process = subprocess.Popen(['kill', '`lsof -i TCP:25333`'], stdout=outFile,
-    stderr=errFile, cwd=config._JPF_DIR, shell=False)
-
-  # Close the local end/python side
-  if pyGateway is not None:
-    pyGateway.close()
 
 
 def analyzeJPFRace():

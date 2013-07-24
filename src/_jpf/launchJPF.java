@@ -65,7 +65,7 @@ public class launchJPF {
       jpfHasRun = true;
 
       if (myJPF.foundErrors()) {
-        log.severe("Errors were found during the JPF run:")
+        log.severe("Errors were found during the JPF run:");
       }
 
     } catch (JPFConfigException cx) {
@@ -194,6 +194,12 @@ public class launchJPF {
     // py4j needs this
     launchJPF gogoJPF = new launchJPF(args);
     GatewayServer server = new GatewayServer(gogoJPF);
-    server.start();
+    //try {
+
+      server.start();
+    //} catch (Exception ex) {
+    //  launchJPF = null;
+    //  server = null;
+    //}
   } // main
 } // class

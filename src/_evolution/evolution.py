@@ -253,7 +253,7 @@ def evolve(generation=0, worstScore=0):
 
       if mutationSuccess:
         moreMutations = True
-        evaluate(individual)
+        evaluate(individual, generation)
         individual.wasRestarted.append(False)
         individual.wasReplaced.append(False)
         runningSum += individual.score[-1]
@@ -714,7 +714,7 @@ def get_operator_chances(candidateChoices, votes):
   return operatorChances
 
 
-def evaluate(individual):
+def evaluate(individual, generation):
   """This method is a bit of a stub. Check if we've seen the mutant before.
   If so, re-use the testing results. If not, invoke JPF (or some other,
   future evalutation method) on it.
@@ -737,10 +737,10 @@ def evaluate(individual):
       Adding it".format(hashVal))
     hashlist.add_hash(hashVal, individual.generation, individual.id)
 
-  evaluate_modelcheck(individual)
+  evaluate_modelcheck(individual, generation)
 
 
-def evaluate_modelcheck(individual):
+def evaluate_modelcheck(individual, generation):
   """Determine the fitness of the individual using a model-checking
   approach and JPF (Java Pathfinder).
 
@@ -763,37 +763,44 @@ def evaluate_modelcheck(individual):
     logger.info("Evaluating individual {}, generation {} with JPF".
       format(individual.id, individual.generation))
 
-    try:
-      run_jpf.runJPF()
+    if (individual.id == 1 and generation == 1):
+      run_jpf.createGateway()
 
-      # Returns a list of (class, method) tuples, eg: [(Account, transfer), (Account, depsite)]
-      raceResult = run_jpf.analyzeJPFRace()
-      logger.debug("raceResult: {}".format(raceResult))
-      # Returns a list of classes involved in the deadlock, eg: ('DiningPhil', 'Philosopher')
-      lockResult = run_jpf.analyzeJPFDeadlock()
-      logger.debug("lockResult: {}".format(lockResult))
+    #try:
+    run_jpf.runJPF()
 
-      stats = run_jpf.getStatistics()
-      logger.debug("Statistics:")
-      logger.debug("Max search depth: {}".format(stats[0]))
-      logger.debug("# visited states: {}".format(stats[1]))
-      logger.debug("# end states: {}".format(stats[2]))
-      logger.debug("# instructions executed: {}".format(stats[3]))
-      logger.debug("Max memory used: {}".format(stats[4]))
+    # Returns a list of (class, method) tuples, eg: [(Account, transfer), (Account, depsite)]
+    raceResult = run_jpf.analyzeJPFRace()
+    logger.debug("raceResult: {}".format(raceResult))
+    # Returns a list of classes involved in the deadlock, eg: ('DiningPhil', 'Philosopher')
+    lockResult = run_jpf.analyzeJPFDeadlock()
+    logger.debug("lockResult: {}".format(lockResult))
 
-      ranOutOfTime = run_jpf.timeExceeded()
-      logger.debug("Ran out of time ({}s): {}".format(config._JPF_SEARCH_TIME_SEC, ranOutOfTime))
+    stats = run_jpf.getStatistics()
+    logger.debug("Statistics:")
+    logger.debug("Max search depth: {}".format(stats[0]))
+    logger.debug("# visited states: {}".format(stats[1]))
+    logger.debug("# end states: {}".format(stats[2]))
+    logger.debug("# instructions executed: {}".format(stats[3]))
+    logger.debug("Max memory used: {}".format(stats[4]))
 
-      depthLimitReached = run_jpf.depthLimitReached()
-      logger.debug("Depth limit ({}) reached: {}".format(config._JPF_SEARCH_DEPTH, depthLimitReached))
+    ranOutOfTime = run_jpf.timeExceeded()
+    logger.debug("Ran out of time ({}s): {}".format(config._JPF_SEARCH_TIME_SEC, ranOutOfTime))
 
-    finally:
-      # In the event of an error, make sure the gateway is shutdown. If it isn't,
-      # this existing gateway will persist and cause future invocations to fail.
-      run_jpf.shutdownGateway
+    depthLimitReached = run_jpf.depthLimitReached()
+    logger.debug("Depth limit ({}) reached: {}".format(config._JPF_SEARCH_DEPTH, depthLimitReached))
+
+    #finally:
+      # TODO: Figure out how to shutdown or re-use the gateway
 
     raceFound = (raceResult != [])
     lockFound = (lockResult != [])
+
+    # We can still have a data race or deadlock even if no tuples are returned.
+    # Check that the depth the search reached is equal to the maximum depth. If
+    # not, then a data race or deadlock occurred.
+    if stats[0] < config._JPF_SEARCH_DEPTH:
+      raceFound = lockFound = True
 
     # JPF can find additional classes and/or methods involved in the data races and
     # deadlocks. Add them to the lists in static.py.
@@ -802,7 +809,7 @@ def evaluate_modelcheck(individual):
       logger.debug("Adding JPF race list to search targets: {}".format(raceResult))
     if lockFound:
       static.add_JPF_lock_list(lockResult)
-      logger.deubg("Adding JPF lock list to search targets: {}".format(loclResult))
+      logger.debug("Adding JPF lock list to search targets: {}".format(lockResult))
 
     # Evaluate the results of the JPF run
     maxFitness = config._CONTEST_RUNS * config._SUCCESS_WEIGHT
