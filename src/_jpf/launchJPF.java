@@ -14,13 +14,13 @@ public class launchJPF {
 
   protected
     String[] args;
-    static Logger log = JPF.getLogger("MyLog");
+    static Logger log = JPF.getLogger("jpfLog");
     JPF myJPF;
     Config conf;
     PreciseRaceDetector jpfRaceDetector;
     DeadlockAnalyzer jpfDeadlockAn;
     BudgetChecker jpfBudgetChecker;
-    Boolean jpfHasRun;
+    Boolean jpfHasRun, outOfMemory;
 
   public launchJPF(String[] inArgs) {
     args = inArgs;
@@ -31,15 +31,30 @@ public class launchJPF {
     args = inArgs;
   }
 
+  public void resetJPF() {
+    args = null;
+    myJPF = null;
+    conf = null;
+    jpfRaceDetector = null;
+    jpfDeadlockAn = null;
+    jpfBudgetChecker = null;
+    jpfHasRun = false;
+    outOfMemory = false;
+    // Lets be really, really sure any old objects are gone!
+    System.gc();
+
+  }
+
   public void runJPF() {
     if (args == null) {
       log.info("launchJPF.java, runJPF: Set args before calling runJPF.");
       return;
     }
     jpfHasRun = false;
+    outOfMemory = false;
 
     try {
-      conf = JPF.createConfig(args);;
+      conf = JPF.createConfig(args);
 
       myJPF = new JPF(conf);
 
@@ -61,6 +76,7 @@ public class launchJPF {
       myJPF.addSearchListener(jpfBudgetChecker);
       myJPF.addVMListener(jpfBudgetChecker);
 
+      log.info("Starting JPF run");
       myJPF.run();
       jpfHasRun = true;
 
@@ -72,15 +88,13 @@ public class launchJPF {
       log.severe(cx.toString());
     } catch (JPFException jx) {
       log.severe(jx.toString());
+    } catch (gov.nasa.jpf.JPF.ExitException exEx) {
+      log.severe(exEx.toString());
+      outOfMemory = true;
     } // try-catch
 
     log.info("CORE invocation of JPF ended.");
   } // RunJPF
-
-
-  public void resetJPF() {
-    jpfHasRun = false;
-  }
 
   public Boolean hasJPFRun() {
     return jpfHasRun;
@@ -148,8 +162,7 @@ public class launchJPF {
       return null;
   }
 
-  public List<Long> getStatistics()
-  {
+  public List<Long> getStatistics() {
     if (!jpfHasRun)
       return null;
 
@@ -169,8 +182,7 @@ public class launchJPF {
     return stat;
   }
 
-  public boolean timeExceeded()
-  {
+  public boolean timeExceeded() {
     if (!jpfHasRun)
       return false;
 
@@ -179,8 +191,7 @@ public class launchJPF {
     return jpfBudgetChecker.timeExceeded();
   }
 
-  public boolean depthLimitReached()
-  {
+  public boolean depthLimitReached() {
     if (!jpfHasRun)
       return false;
 
@@ -189,17 +200,17 @@ public class launchJPF {
     return jpfSearch.getDepth() >= jpfSearch.getDepthLimit();
   }
 
+  public boolean outOfMemory() {
+    if (!jpfHasRun)
+      return false;
+
+    return outOfMemory;
+  }
 
   public static void main(String[] args) {
     // py4j needs this
     launchJPF gogoJPF = new launchJPF(args);
     GatewayServer server = new GatewayServer(gogoJPF);
-    //try {
-
-      server.start();
-    //} catch (Exception ex) {
-    //  launchJPF = null;
-    //  server = null;
-    //}
+    server.start();
   } // main
 } // class

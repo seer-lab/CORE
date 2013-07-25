@@ -23,6 +23,7 @@ logger = logging.getLogger('core')
 
 jpfLauncher = None
 jpfProcess = None
+jpfOutOfMemory = None
 
 def createGateway():
   # Compile and run the Java end of the gateway
@@ -40,16 +41,16 @@ def createGateway():
   process.wait()
 
   # Debugging
-  outFile.seek(0)
-  errFile.seek(0)
-  output = outFile.read()
-  error = errFile.read()
-  outFile.close()
-  errFile.close()
-  logger.debug("Compile, Output text:\n")
-  logger.debug(output)
-  logger.debug("Compile, Error text:\n")
-  logger.debug(error)
+  # outFile.seek(0)
+  # errFile.seek(0)
+  # output = outFile.read()
+  # error = errFile.read()
+  # outFile.close()
+  # errFile.close()
+  # logger.debug("Compile, Output text:\n")
+  # logger.debug(output)
+  # logger.debug("Compile, Error text:\n")
+  # logger.debug(error)
 
   outFile = tempfile.SpooledTemporaryFile()
   errFile = tempfile.SpooledTemporaryFile()
@@ -74,7 +75,7 @@ def createGateway():
   logger.debug(error)
 
 
-def runJPF():
+def runJPF(individualID, generation):
   """Create the JPF instance, configure it, invoke it and wait for the
   results.
 
@@ -83,7 +84,7 @@ def runJPF():
   """
 
   global jpfLauncher
-
+  global jpfOutOfMemory
 
   # Create the local part of the gateway and connect to the Java end
 
@@ -101,25 +102,29 @@ def runJPF():
   #       Instead, create them in the launchJPF.java class and add them
   #       to JPF there. (See BudgetChecker as an example.)
 
-  jpfConfig = pyGateway.new_array(pyGateway.jvm.java.lang.String, 6)
+  jpfConfig = pyGateway.new_array(pyGateway.jvm.java.lang.String, 9)
   jpfConfig[0] = config._JPF_CONFIG  # The .jpf file
   jpfConfig[1] = '+classpath=' + config._PROJECT_CLASS_DIR
   jpfConfig[2] = '+sourcepath=' + config._PROJECT_SRC_DIR
   jpfConfig[3] = 'search.class = gov.nasa.jpf.search.BFSearch'
   jpfConfig[4] = 'search.depth_limit = ' + str(config._JPF_SEARCH_DEPTH)
   jpfConfig[5] = 'budget.max_time = ' + str(config._JPF_SEARCH_TIME_SEC * 1000)
+  jpfConfig[6] = 'log.level = info'
+  jpfConfig[7] = 'log.output = JPFLog-test-do-i-exist-no-i-dont-why.txt'
+  jpfConfig[8] = 'log.info = jpfLog' # Matches launchJPF.java
+
+  #jpfConfig[7] = 'log.output = JPFLog-' + str(individualID) + '-' + str(generation) + '.txt'
 
   # Invoke JPF through the gateway
   logger.debug("Running JPF throught the bridge.")
   jpfLauncher.resetJPF()
   jpfLauncher.setArgs(jpfConfig)
-  jpfLauncher.runJPF()
 
-  # Wait for JPF to complete
-  #logger.debug("Waiting for JPF to complete.")
-  while jpfLauncher.hasJPFRun() == False:
-     time.sleep(1)
-  #logger.debug("JPF finished.")
+  jpfOutOfMemory = False
+  try:
+    jpfLauncher.runJPF()
+  except py4j.protocol.Py4JJavaError:
+    jpfOutOfMemory = True
 
 
 def shutdownJPFProcess():
@@ -129,6 +134,13 @@ def shutdownJPFProcess():
   jpfProcess.send_signal(3)
   time.sleep(1)
   jpfProcess.terminate()
+
+
+def hasJPFRun():
+
+  global jpfLauncher
+
+  return jpfLauncher.hasJPFRun()
 
 
 def analyzeJPFRace():
@@ -241,6 +253,14 @@ def getStatistics():
   return jpfLauncher.getStatistics()
 
 
+def getErrorString():
+
+  global jpfLauncher
+
+  # Constructed in deadlock, passed back raw here
+  return jpfLauncher.getDeadlockErrorMessage()
+
+
 def timeExceeded():
   """ Did we run out of time? That is, did the search take longer than
   config._JPF_SEARCH_TIME_SEC seconds?
@@ -263,3 +283,19 @@ def depthLimitReached():
   global jpfLauncher
 
   return jpfLauncher.depthLimitReached()
+
+
+def outOfMemory():
+  """ Did JPF crash with an out of memory error?
+
+  Returns:
+    (boolean): Did it?
+  """
+
+  global jpfLauncher
+  global jpfOutOfMemory
+
+  if jpfOutOfMemory:
+    return True
+
+  return jpfLauncher.outOfMemory()

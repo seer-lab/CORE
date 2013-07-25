@@ -696,7 +696,7 @@ def compile_project():
   #logger.debug(errText)
 
   if (outText.find("build failed") >= 0 or errText.find("build failed") >= 0):
-    logger.debug("Ant 'compile' command failed, could not compile project in work area")
+    #logger.debug("Ant 'compile' command failed, could not compile project in work area")
     return False
   else:
     return True

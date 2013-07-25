@@ -257,7 +257,7 @@ def do_we_have_merged_classVar():
 
 def create_final_triple():
   if len(classMeth) == 0 or not do_we_have_merged_classVar():
-    logger.debug("Couldn't create the list of (class, method, variable) triples")
+    #logger.debug("Couldn't create the list of (class, method, variable) triples")
     #logger.debug("One or both of the static analysis and ConTest shared variable detection didn't")
     #logger.debug("find anything, or failed. As we are missing one (or both) of class.method and")
     #logger.debug("class.variable, config.finalCMV, the list of class-method-variable triples")
@@ -269,10 +269,10 @@ def create_final_triple():
       if cmTuple[-2] == cvTuple[-2]:  # Must be the same class
         aTriple = (cmTuple[-2], cmTuple[-1], cvTuple[-1]) # Class, method, variable
         if not find_tuple_in_list(aTriple, finalCMV):
-          logger.debug("Adding triple {} to finalCMV".format(aTriple))
+          #logger.debug("Adding triple {} to finalCMV".format(aTriple))
           finalCMV.append(aTriple)
 
-  logger.info("Populated (class, method, variable) list with Chord and ConTest data")
+  #logger.info("Populated (class, method, variable) list with Chord and ConTest data")
   return True
 
 

@@ -41,6 +41,8 @@ _population = []
 # Global FunctionalPhase to avoid passing it around
 _functionalPhase = True
 
+# Are we still using JPF in the evalutation
+_useJPF = True
 
 def initialize(bestIndividual=None):
   """Initialize the population of individuals for either the functional or
@@ -106,19 +108,17 @@ def start():
     # Check to see if a fixed member/program was found in phase 1.
     # If so, proceed to phase 2, optimization.
     if bestFunctional.successes[-1]/config._CONTEST_RUNS == 1.0 and bestFunctional.validated:
+      logger.info("*********************************")
+      logger.info("Fixed individual found in phase 1")
+      logger.info("*********************************")
+      logger.info(bestFunctional)
+      logger.info("")
 
       # Proceed with the optimization phase, if enabled
       if not config._ONLY_FUNCTIONAL:
 
         _functionalPhase = False
         bestFunctional.switchGeneration = bestFunctional.generation
-
-        logger.info("*********************************")
-        logger.info("Fixed individual found in phase 1")
-        logger.info("*********************************")
-        logger.info(bestFunctional)
-        logger.info("")
-
         # Reinitialize the population with the best functional individual
         logger.debug("Preparing for phase 2, optimization")
         logger.debug("Repopulating with best individual {} at generation {}".format(
@@ -386,7 +386,7 @@ def mutation(individual, deadlockVotes, dataraceVotes, OptimizationVotes):
     if totNumMutants == 0:
       logger.error("Fixing phase: This individual had no mutants, so we replaced")
       logger.error("it with the original, pristine project. Somehow, no mutants")
-      logger.error("were generated for the pristine project!. This is very odd.")
+      logger.error("were generated from the pristine project!. This is very odd.")
       logger.error("Check if CORE is operating correctly.")
       raise Exception("mutation fn, Fixing phase: Pristine project has no mutants")
 
@@ -482,10 +482,10 @@ def mutation(individual, deadlockVotes, dataraceVotes, OptimizationVotes):
     txl_operator.move_mutant_to_local_project(individual.generation, individual.id,
                                               selectedOperator[0], randomMutant + 1)
     txl_operator.move_local_project_to_workarea(individual.generation, individual.id)
-    logger.debug("Attempting to compile...")
+    #logger.debug("Attempting to compile...")
 
     if txl_operator.compile_project():
-      logger.debug("Success!")
+      #logger.debug("Success!")
 
       # Update individual with the successful operator type
       individual.lastOperator = selectedOperator
@@ -494,8 +494,8 @@ def mutation(individual, deadlockVotes, dataraceVotes, OptimizationVotes):
       # Switch the appropriate bit to 1 to record which mutant is used
       individual.genome[operatorIndex][randomMutant] = 1
 
-      logger.debug("Selected operator for Individual {} at generation {}: {}, number {}".
-        format(individual.id, individual.generation, selectedOperator[0], randomMutant + 1))
+      #logger.debug("Selected operator for Individual {} at generation {}: {}, number {}".
+      #  format(individual.id, individual.generation, selectedOperator[0], randomMutant + 1))
       return True
     # If the project didn't compile and we have retries left, go back to the start of the
     # while loop and try again
@@ -656,7 +656,7 @@ def feedback_selection(individual, deadlockVotes, dataraceVotes,
       selectedOperator = candidateChoices[i]
       break
 
-  logger.debug("Selected operator returned: {}".format(selectedOperator[0]))
+  #logger.debug("Selected operator returned: {}".format(selectedOperator[0]))
 
   return selectedOperator
 
@@ -728,6 +728,9 @@ def evaluate(individual, generation):
     No return value
   """
 
+  global _functionalPhase
+  global _useJPF
+
   # If the mutant is a repeat, there is nothing more to do here
   seenBefore, hashVal = check_repeat_mutant(individual)
   if seenBefore:
@@ -740,7 +743,12 @@ def evaluate(individual, generation):
       Adding it".format(hashVal))
     hashlist.add_hash(hashVal, individual.generation, individual.id)
 
-  evaluate_modelcheck(individual, generation)
+  if _functionalPhase and _useJPF:
+    TryContest = evaluate_modelcheck(individual, generation)
+    if (TryContest):
+      evaluate_contest(individual)
+  else:
+    evaluate_contest(individual)
 
 
 def evaluate_modelcheck(individual, generation):
@@ -754,129 +762,134 @@ def evaluate_modelcheck(individual, generation):
   """
 
   global _functionalPhase
+  global _useJPF
 
-  # The JPF analysis my fail. For example, by running out of time.
-  # If this is the case we can fall back on ConTest to perform
-  # the evaluation.
-  fallbackOnConTest = False
+  logger.info("Evaluating individual {}, generation {} with JPF".
+    format(individual.id, individual.generation))
 
-  # During the bug fixing phase we try evaluating the candidate with
-  # JPF first.
-  if _functionalPhase:
-    logger.info("Evaluating individual {}, generation {} with JPF".
-      format(individual.id, individual.generation))
+  if (individual.id == 1 and generation == 1):
+    run_jpf.createGateway()
 
-    if (individual.id == 1 and generation == 1):
-      run_jpf.createGateway()
+  run_jpf.runJPF(individual.id, generation)
 
-    #try:
-    run_jpf.runJPF()
+  # After running JPF, display any errors detected right away
+  errStr = None
+  errStr = run_jpf.getErrorString()
+  if len(errStr) > 0:
+    logger.debug("Error string: {}".format(errStr))
 
-    # Returns a list of (class, method) tuples, eg: [(Account, transfer), (Account, depsite)]
-    raceResult = run_jpf.analyzeJPFRace()
-    logger.debug("raceResult: {}".format(raceResult))
-    # Returns a list of classes involved in the deadlock, eg: ('DiningPhil', 'Philosopher')
-    lockResult = run_jpf.analyzeJPFDeadlock()
-    logger.debug("lockResult: {}".format(lockResult))
+  if run_jpf.outOfMemory():
+    logger.error("JPF ran out of memory. This means something has gone wrong.")
+    logger.error("Turning JPF off. For the rest of this run, only ConTest will be used.")
+    _useJPF = False
+    return True
 
-    stats = run_jpf.getStatistics()
-    logger.debug("Statistics:")
-    logger.debug("Max search depth: {}".format(stats[0]))
-    logger.debug("# visited states: {}".format(stats[1]))
-    logger.debug("# end states: {}".format(stats[2]))
-    logger.debug("# instructions executed: {}".format(stats[3]))
-    logger.debug("Max memory used: {}".format(stats[4]))
+  if not run_jpf.hasJPFRun():
+    logger.error("Something has gone wrong. JPF hasn't run or hasn't completed running.")
+    logger.error("Turning JPF off. For the rest of this run, only ConTest will be used.")
+    _useJPF = False
+    return True
 
-    ranOutOfTime = run_jpf.timeExceeded()
-    logger.debug("Ran out of time ({}s): {}".format(config._JPF_SEARCH_TIME_SEC, ranOutOfTime))
+  # Returns a list of (class, method) tuples, eg: [(Account, transfer), (Account, depsite)]
+  raceResult = run_jpf.analyzeJPFRace()
+  logger.debug("raceResult: {}".format(raceResult))
+  # Returns a list of classes involved in the deadlock, eg: ('DiningPhil', 'Philosopher')
+  lockResult = run_jpf.analyzeJPFDeadlock()
+  logger.debug("lockResult: {}".format(lockResult))
 
-    depthLimitReached = run_jpf.depthLimitReached()
-    logger.debug("Depth limit ({}) reached: {}".format(config._JPF_SEARCH_DEPTH, depthLimitReached))
+  stats = run_jpf.getStatistics()
+  if stats is None:
+    logger.error("Something has gone wrong with JPF. No statistics were collected.")
+    logger.error("Turning JPF off. For the rest of this run, only ConTest will be used.")
+    _useJPF = False
+    return True
 
-    #finally:
-      # TODO: Figure out how to shutdown or re-use the gateway
+  logger.debug("Statistics:")
+  logger.debug("  Max search depth: {}".format(stats[0]))
+  logger.debug("  # visited states: {}".format(stats[1]))
+  logger.debug("  # end states: {}".format(stats[2]))
+  logger.debug("  # instructions executed: {}".format(stats[3]))
+  logger.debug("  Max memory used: {}".format(stats[4]))
+  SearchDepth = stats[0]
 
-    raceFound = (raceResult != [])
-    lockFound = (lockResult != [])
+  ranOutOfTime = run_jpf.timeExceeded()
+  logger.debug("Ran out of time ({}s): {}".format(config._JPF_SEARCH_TIME_SEC, ranOutOfTime))
 
-    # We can still have a data race or deadlock even if no tuples are returned.
-    # Check that the depth the search reached is equal to the maximum depth. If
-    # not, then a data race or deadlock occurred.
-    if stats[0] < config._JPF_SEARCH_DEPTH:
-      raceFound = lockFound = True
+  depthLimitReached = run_jpf.depthLimitReached()
+  logger.debug("Depth limit ({}) reached: {}".format(config._JPF_SEARCH_DEPTH, depthLimitReached))
 
-    # JPF can find additional classes and/or methods involved in the data races and
-    # deadlocks. Add them to the lists in static.py.
-    if raceFound:
-      static.add_JPF_race_list(raceResult)
-      logger.debug("Adding JPF race list to search targets: {}".format(raceResult))
-    if lockFound:
-      static.add_JPF_lock_list(lockResult)
-      logger.debug("Adding JPF lock list to search targets: {}".format(lockResult))
+  raceFound = (raceResult != [])
+  lockFound = (lockResult != [])
 
-    # Evaluate the results of the JPF run
-    maxFitness = config._CONTEST_RUNS * config._SUCCESS_WEIGHT
-    logger.debug("Max fitness: {}".format(maxFitness))
+  # JPF can find additional classes and/or methods involved in the data races and
+  # deadlocks. Add them to the lists in static.py.
+  if raceFound:
+    static.add_JPF_race_list(raceResult)
+    #logger.debug("Adding JPF race list to search targets: {}".format(raceResult))
+  if lockFound:
+    static.add_JPF_lock_list(lockResult)
+    #logger.debug("Adding JPF lock list to search targets: {}".format(lockResult))
 
-    if raceFound or lockFound:
-      # Higher fitness is assigned for races/locks found at higher search depths
-      # If error is found at depth 19, the max depth is 50 and max fitness is 1000,
-      # the assigned fitness is (19 / 50) * 1000 = 380
-      rlFitness = (stats[0] / config._JPF_SEARCH_DEPTH) * maxFitness
-      individual.score.append(rlFitness)
-      individual.evalMethod.append('JPF')
-      individual.successes.append(-1)
-      individual.timeouts.append(-1)
-      individual.dataraces.append(-1)
-      individual.deadlocks.append(-1)
-      individual.errors.append(-1)
-      logger.debug("Race or lock found, fitness score assigned is {}".format(rlFitness))
+  maxFitness = config._CONTEST_RUNS * config._SUCCESS_WEIGHT
+  logger.debug("Max fitness: {}".format(maxFitness))
 
-    elif ranOutOfTime or depthLimitReached:
-      if ranOutOfTime:
-        logger.debug("Search time limit, {}s, exceeded".format(config._JPF_SEARCH_TIME_SEC))
-      if depthLimitReached:
-        logger.debug("Search depth, {}, exceeded".format(config._JPF_SEARCH_DEPTH))
-      logger.debug("As the search was inconclusive, ConTest will be invoked.")
-      fallbackOnConTest = true
+  # Deep breath. If we've made it this far, we can attemptp to make sense of the results
 
-    elif not raceFound and not lockFound:
-      # A potentially correct program was found
-      individual.score.append(maxFitness)
-      individual.evalMethod.append('JPF')
-      # Terminate() fn below double-checks a potentially correct program when
-      # individual.successes[-1]/config._CONTEST_RUNS == 1
-      individual.successes.append(config._CONTEST_RUNS)
-      individual.timeouts.append(-1)
-      individual.dataraces.append(-1)
-      individual.deadlocks.append(-1)
-      individual.errors.append(-1)
-      logger.debug("No races or locks were found within the time and depth constraints.")
-      logger.debug("Max fitness, {}, assigned.".format(maxFitness))
-      logger.debug("NOTE: This doesn't assure the program is bug free.")
-      logger.debug("It only assures that within the time given, {}s,".
-        format(config._JPF_SEARCH_TIME_SEC))
-      logger.debug("and max. search depth, {}, no races or locks were found.".
-        format(config._JPF_SEARCH_DEPTH))
+  if ranOutOfTime:
+    logger.debug("The JPF evalutation ran out of time. We're going to assume it")
+    logger.debug("will keep running out of time. So, for efficiencys sake, JPF")
+    logger.debug("will be turned off for the rest of this run. Only ConTest will")
+    logger.debug("be used.")
+    _useJPF = False
+    return True
 
-    else:
-      logger.error("A case not considered in the JPF evalution has occurred:")
-      logger.error("raceFound: {}, lockFound: {}".format(raceFound, lockFound))
-      logger.error("ranOutOfTime: {}, depthLimitReached: {}"
-        .format(ranOutOfTime, depthLimitReached))
-      logger.error("Falling back on ConTest analysis.")
-      fallbackOnConTest = true
+  if depthLimitReached and (raceFound or lockFound):
+    logger.debug("We've reached the configured depth limit, {}.".format(config._JPF_SEARCH_DEPTH))
+    logger.debug("Unfortunately there are still bugs. It looks like JPF in its")
+    logger.debug("current configuration won't be able to help us any more.")
+    logger.debug("For the rest of this run, only ConTest will be used.")
+    _useJPF = False
+    return True
 
-  # During the optimization phase we use ConTest to evaluate candidate
-  # optimizations. During the fixing phase we can fall back on ConTest if
-  # JPF fails.
-  if not _functionalPhase or fallbackOnConTest:
-    # TODO: My first thought is that JPF can only be used during the
-    #       bug fixing phase.  For the optimization phase we have to
-    #       fall back on ConTest.
-    #       Check this again once JPF is better integrated and I have
-    #       a strategy for the bug fixing phases fitness function.
-    evaluate_contest(individual)
+  if depthLimitReached and not raceFound and not lockFound:
+    logger.debug("We've reached the configured depth limit, {}.".format(config._JPF_SEARCH_DEPTH))
+    logger.debug("No deadlocks or data races were reported, so we may have")
+    logger.debug("a correct program. (To this depth.) Invoking ConTest for")
+    logger.debug("further testing.")
+    return True
+
+  if (raceFound or lockFound):
+    logger.debug("Deadlock and/or data race found at depth {} (out of {})."
+      .format(SearchDepth, config._JPF_SEARCH_DEPTH))
+    logger.debug(" Assign fitness and move on.")
+    # Higher fitness is assigned for races/locks found at higher search depths
+    # If error is found at depth 19, the max depth is 50 and max fitness is 1000,
+    # the assigned fitness is (19 / 50) * 1000 = 380
+    individual.score.append((SearchDepth / config._JPF_SEARCH_DEPTH) * maxFitness)
+    individual.evalMethod.append('JPF')
+    individual.successes.append(-1)
+    individual.timeouts.append(-1)
+    individual.dataraces.append(-1)
+    individual.deadlocks.append(-1)
+    individual.errors.append(-1)
+    return False
+
+  elif not raceFound and not lockFound:
+    logger.debug("No data races or deadlocks found at depth {} (out of {})"
+      .format(SearchDepth, config._JPF_SEARCH_DEPTH))
+
+    # TODO: Should I record any JPF results (successes, ...) if ConTest, not JPF,
+    #       is going to do the evaluation?
+    individual.score.append((SearchDepth / config._JPF_SEARCH_DEPTH) * maxFitness)
+    individual.evalMethod.append('JPF')
+    # Terminate() fn below double-checks a potentially correct program when
+    # individual.successes[-1]/config._CONTEST_RUNS == 1
+    individual.successes.append(config._CONTEST_RUNS) # Want sudden death evaluation
+    individual.timeouts.append(-1)
+    individual.dataraces.append(-1)
+    individual.deadlocks.append(-1)
+    individual.errors.append(-1)
+    return True
 
 
 def evaluate_contest(individual):  #, worstScore):
