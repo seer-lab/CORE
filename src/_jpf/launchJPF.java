@@ -14,13 +14,14 @@ public class launchJPF {
 
   protected
     String[] args;
+    String exceptionText;
     static Logger log = JPF.getLogger("jpfLog");
     JPF myJPF;
     Config conf;
     PreciseRaceDetector jpfRaceDetector;
     DeadlockAnalyzer jpfDeadlockAn;
     BudgetChecker jpfBudgetChecker;
-    Boolean jpfHasRun, outOfMemory;
+    Boolean jpfHasRun;
 
   public launchJPF(String[] inArgs) {
     args = inArgs;
@@ -39,10 +40,9 @@ public class launchJPF {
     jpfDeadlockAn = null;
     jpfBudgetChecker = null;
     jpfHasRun = false;
-    outOfMemory = false;
+    exceptionText = "";
     // Lets be really, really sure any old objects are gone!
     System.gc();
-
   }
 
   public void runJPF() {
@@ -51,7 +51,7 @@ public class launchJPF {
       return;
     }
     jpfHasRun = false;
-    outOfMemory = false;
+    exceptionText = "";
 
     try {
       conf = JPF.createConfig(args);
@@ -86,12 +86,13 @@ public class launchJPF {
 
     } catch (JPFConfigException cx) {
       log.severe(cx.toString());
+      exceptionText += cx.toString();
+      exceptionText += " ";
     } catch (JPFException jx) {
       log.severe(jx.toString());
-    } catch (gov.nasa.jpf.JPF.ExitException exEx) {
-      log.severe(exEx.toString());
-      outOfMemory = true;
-    } // try-catch
+      exceptionText += jx.toString();
+      exceptionText += " ";
+    }
 
     log.info("CORE invocation of JPF ended.");
   } // RunJPF
@@ -131,7 +132,10 @@ public class launchJPF {
       errString += getErrorDetails(i);
     }
 
-    return errString;
+    if (errString == "")
+      return null;
+    else
+      return errString;
   }
 
   // Required by py4j
@@ -160,6 +164,11 @@ public class launchJPF {
       return myJPF.getSearch().getErrors().get(i).getDetails();
     else
       return null;
+  }
+
+  public String getExceptionText() {
+    // JPF might not have run correctly, but still set the exception text
+    return exceptionText;
   }
 
   public List<Long> getStatistics() {
@@ -198,13 +207,6 @@ public class launchJPF {
     // From  src/.../jpf/search/Search.java
     gov.nasa.jpf.search.Search jpfSearch = myJPF.getSearch();
     return jpfSearch.getDepth() >= jpfSearch.getDepthLimit();
-  }
-
-  public boolean outOfMemory() {
-    if (!jpfHasRun)
-      return false;
-
-    return outOfMemory;
   }
 
   public static void main(String[] args) {

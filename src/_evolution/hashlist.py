@@ -55,7 +55,6 @@ def find_hash(newHash):
     return (None, None)
 
 
-
 def add_hash(newHash, generation, memberNum):
   """ Add (generation, memberNum) -> newHash to the dictionary """
 

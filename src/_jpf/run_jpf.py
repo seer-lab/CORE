@@ -20,15 +20,13 @@ import logging
 logger = logging.getLogger('core')
 
 # Global variables
-
-jpfLauncher = None
-jpfProcess = None
-jpfOutOfMemory = None
+_jpfLauncher = None
+_jpfProcess = None
 
 def createGateway():
   # Compile and run the Java end of the gateway
 
-  global jpfProcess
+  global _jpfProcess
 
   outFile = tempfile.SpooledTemporaryFile()
   errFile = tempfile.SpooledTemporaryFile()
@@ -57,7 +55,7 @@ def createGateway():
 
   logger.debug("Starting the Java side of the bridge.")
   # Run/start src/_jpf/launchJPF.java so we can connect to it throught py4j
-  jpfProcess = subprocess.Popen(['java', '-Xmx{}m'.format(config._PROJECT_TEST_MB),
+  _jpfProcess = subprocess.Popen(['java', '-Xmx{}m'.format(config._PROJECT_TEST_MB),
     '-cp', ".:" + config._JPF_JAR + ":" + config._PY4J_JAR, 'launchJPF'],
     stdout=outFile, stderr=errFile, cwd=config._JPF_DIR, shell=False)
   time.sleep(2) # Wouldn't it be ironic if this lead to a data race
@@ -83,8 +81,7 @@ def runJPF(individualID, generation):
     No return value
   """
 
-  global jpfLauncher
-  global jpfOutOfMemory
+  global _jpfLauncher
 
   # Create the local part of the gateway and connect to the Java end
 
@@ -92,7 +89,7 @@ def runJPF(individualID, generation):
   #logger.debug("Creating the python side of the bridge.")
   pyGateway = JavaGateway(auto_convert=True)
 
-  jpfLauncher = pyGateway.entry_point.getJPFInstance()
+  _jpfLauncher = pyGateway.entry_point.getJPFInstance()
 
   # Create the configuration list for JPF. Note that we are creating a Java
   # array (of Strings), not a Python list
@@ -117,59 +114,87 @@ def runJPF(individualID, generation):
 
   # Invoke JPF through the gateway
   logger.debug("Running JPF throught the bridge.")
-  jpfLauncher.resetJPF()
-  jpfLauncher.setArgs(jpfConfig)
+  _jpfLauncher.resetJPF()
+  _jpfLauncher.setArgs(jpfConfig)
 
-  jpfOutOfMemory = False
   try:
-    jpfLauncher.runJPF()
-  except py4j.protocol.Py4JJavaError:
-    jpfOutOfMemory = True
+    _jpfLauncher.runJPF()
+  except:
+    logger.error("Encountered an exception: {}".format(sys.exc_info()[0]))
 
 
 def shutdownJPFProcess():
 
-  global jpfProcess
+  global _jpfProcess
 
-  jpfProcess.send_signal(3)
+  _jpfProcess.send_signal(3)
   time.sleep(1)
-  jpfProcess.terminate()
+  _jpfProcess.terminate()
 
 
 def hasJPFRun():
 
-  global jpfLauncher
+  global _jpfLauncher
 
-  return jpfLauncher.hasJPFRun()
+  return _jpfLauncher.hasJPFRun()
 
 
-def analyzeJPFRace():
-  """When JPF detects a datarace, the message looks similar to this
+def wasADataraceFound():
+  """Race messages can come from two places. The first is from the race
+  object:
 
   Thread-1 at Account.transfer(pc 17)
    : putfield
   Thread-2 at Account.depsite(pc 2)
    : getfield
 
+  The second is from the error text (why?):
+
+  gov.nasa.jpf.listener.PreciseRaceDetector race for field NewThread.endd
+    main at Loader.main(pc 135)
+  "  : getstatic
+    Thread-1 at NewThread.<init>(pc 24)
+  "  : putstatic
+
   Returns
-    raceTuples (list (class, method) tuples): List of classes and methods
+    None or raceTuples (list (class, method) tuples): List of classes and methods
       involved in the data race.
       eg: [(Account, transfer), (Account, depsite)]
   """
 
-  global jpfLauncher
+  global _jpfLauncher
 
-  jpfRaceStr = jpfLauncher.getDataRaceErrorMessage()
+  jpfRaceStr = _jpfLauncher.getDataRaceErrorMessage()
+  if jpfRaceStr is not None and jpfRaceStr.find("putfield") > 0 \
+    and jpfRaceStr.find("getfield") > 0 and \
+    re.search("(\S+)\.(\S+)\((\S+)", jpfRaceStr) is not None:
+    return True
+
+  jpfErrStr = getErrorString()
+  if jpfErrStr is not None and jpfErrStr.find("gov.nasa.jpf.listener.PreciseRaceDetector") > 0 \
+    and re.search("(\S+)\.(\S+)\((\S+)", jpfErrStr) is not None:
+    return True
+
+  return False
+
+
+def getInfoInDatarace():
+
+  global _jpfLauncher
+
+  if not wasADataraceFound():
+    return None
+
+  # Cheat: Since we know that one or both of the strings in wasADataRaceFound()
+  # has races, concatenate the two together and search them both at once
+  jpfRaceStr = _jpfLauncher.getDataRaceErrorMessage() + getErrorString()
   raceTuples = []
 
-  if jpfRaceStr == None:
-    return raceTuples
-
-  if  jpfRaceStr.find("putfield") < 0 and jpfRaceStr.find("getfield") < 0:
-    return raceTuples
+  if jpfRaceStr == None: # This shouldn't happen
+    return None
 
   # Look for class.method
-  for i in range(1, 3): # Assuming 3 threads at most involved
+  for i in range(1, 6): # Arbitrary loop count
     race = re.search("(\S+)\.(\S+)\((\S+)", jpfRaceStr)
     if race is not None:
       aClass = race.group(1)
@@ -181,13 +206,23 @@ def analyzeJPFRace():
 
     # Remove the class.method that was just found from the string
     if ("Thread-" in jpfRaceStr):
-      jpfRaceStr =  jpfRaceStr.split("Thread-",1)[1]
+      jpfRaceStr =  jpfRaceStr.split("Thread-", 1)[1]
 
   return raceTuples
 
 
-def analyzeJPFDeadlock():
-  """When JPF detects a deadlock, the error message looks like
+def wasADeadlockFound():
+  """When JPF detects a deadlock, one of two messages may be returned. They are:
+
+  gov.nasa.jpf.vm.NotDeadlockedProperty deadlock encountered:
+  thread java.lang.Thread:{id:0,name:main,status:WAITING,priority:5,lockCount:0,suspendCount:0}
+  thread java.lang.Thread:{id:1,name:0,status:BLOCKED,priority:5,lockCount:0,suspendCount:0}
+  ...
+  thread java.lang.Thread:{id:6,name:5,status:BLOCKED,priority:5,lockCount:0,suspendCount:0}
+  thread java.lang.Thread:{id:7,name:6,status:TERMINATED,priority:5,lockCount:0,suspendCount:0}
+  ...
+
+  and
 
   gov.nasa.jpf.vm.NotDeadlockedProperty
   Error 0 Details:
@@ -196,24 +231,44 @@ def analyzeJPFDeadlock():
     lockCount:0,suspendCount:0}
   thread DiningPhil$Philosopher:{id:2,name:Thread-2,status:BLOCKED,priority:5,\
     lockCount:0,suspendCount:0}
+  ...
+
+  This function looks for the text string "NotDeadlockedProperty". In either of these
+  messages.
 
   Returns
-    lockList (list string): List of classes involved in the deadlock
+    deadlockFound (boolean): Was a deadlock found?
+  """
+
+  global _jpfLauncher
+
+  jpfDeadlockStr = getErrorString()
+
+  return jpfDeadlockStr.find("NotDeadlockedProperty") > 0
+
+
+def getClassesInDeadlock():
+  """The second deadlock text in wasADeadlockFound() contains the classes
+  involved in the deadlock. (eg. DiningPhil$Philosopher) Extract them so
+  CORE can target the search for a fix better.
+
+  Returns
+    None or lockList (list string): List of classes involved in the deadlock
                             eg: ('DiningPhil', 'Philosopher')
   """
 
-  global jpfLauncher
+  global _jpfLauncher
 
-  jpfDeadlockStr = jpfLauncher.getDeadlockErrorMessage()
-  lockList = []
-
+  jpfDeadlockStr = _jpfLauncher.getDeadlockErrorMessage()
   if jpfDeadlockStr == None:
-    return lockList
+    return None
 
-  if  jpfDeadlockStr.find("NotDeadlockedProperty") < 0 and jpfDeadlockStr.find("status:BLOCKED") < 0:
-    return lockList
+  if  jpfDeadlockStr.find("NotDeadlockedProperty") < 0 and \
+    re.search("(\S+)\$(\S+):\{", jpfDeadlockStr) is None:
+    return None
 
   # Look for classes
+  lockList = []
   for i in range(1, 5):
     lock = re.search("(\S+)\$(\S+):\{", jpfDeadlockStr)
     if lock is not None:
@@ -226,7 +281,7 @@ def analyzeJPFDeadlock():
 
     # Remove the class.method that was just found from the string
     if ("suspendCount" in jpfDeadlockStr):
-      jpfDeadlockStr =  jpfDeadlockStr.split("suspendCount",1)[1]
+      jpfDeadlockStr =  jpfDeadlockStr.split("suspendCount", 1)[1]
 
   return lockList
 
@@ -246,19 +301,26 @@ def getStatistics():
     (list long): Statistics for the JPF run.
   """
 
-  global jpfLauncher
+  global _jpfLauncher
 
   # py4j handles turning java's list<long> into a python list. see
   # http://py4j.sourceforge.net/getting_started.html#collections-help-and-constructors
-  return jpfLauncher.getStatistics()
+  return _jpfLauncher.getStatistics()
 
 
 def getErrorString():
 
-  global jpfLauncher
+  global _jpfLauncher
 
   # Constructed in deadlock, passed back raw here
-  return jpfLauncher.getDeadlockErrorMessage()
+  return _jpfLauncher.getDeadlockErrorMessage()
+
+
+def getExceptionText():
+
+  global _jpfLauncher
+
+  return _jpfLauncher.getExceptionText()
 
 
 def timeExceeded():
@@ -268,9 +330,9 @@ def timeExceeded():
   Returns
     (boolean): Did we run out of time?
   """
-  global jpfLauncher
+  global _jpfLauncher
 
-  return jpfLauncher.timeExceeded()
+  return _jpfLauncher.timeExceeded()
 
 
 def depthLimitReached():
@@ -280,22 +342,26 @@ def depthLimitReached():
     (boolean): Did we reach the depth limit?
   """
 
-  global jpfLauncher
+  global _jpfLauncher
 
-  return jpfLauncher.depthLimitReached()
+  return _jpfLauncher.depthLimitReached()
 
 
 def outOfMemory():
-  """ Did JPF crash with an out of memory error?
+  """ Did JPF crash with an out of memory error? There are multiple out of
+  memory checks. Each one was put in after run_jpf.py, py4j or launchJPF.java
+  reported an out of memory exception.
 
   Returns:
     (boolean): Did it?
   """
 
-  global jpfLauncher
-  global jpfOutOfMemory
+  global _jpfLauncher
 
-  if jpfOutOfMemory:
+  errStr = getErrorString()
+  if errStr is not None and errStr.find("gov.nasa.jpf.vm.NoOutOfMemoryErrorProperty") > 0:
     return True
 
-  return jpfLauncher.outOfMemory()
+  excStr = getExceptionText()
+  if excStr is not None and excStr.find("out-of-memory termination") > 0:
+    return True

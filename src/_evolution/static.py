@@ -331,7 +331,7 @@ def add_JPF_race_list(JPFlist):
 
   for aTuple in JPFlist:
     if not aTuple in classMeth:
-      classMeth.add(ATuple)
+      classMeth.append(aTuple)
 
   create_final_triple()
 
@@ -348,6 +348,6 @@ def add_JPF_lock_list(JPFList):
     for aTuple in classMeth:
       newTuple = (aItem, aTuple[1])
       if not newTuple in classMeth:
-        classMeth.Add(newTuple)
+        classMeth.append(newTuple)
 
   create_final_triple()
