@@ -9,6 +9,8 @@ Copyright David Kelk, 2013
 # py4j is a library for calling java methods from python
 # http://py4j.sourceforge.net/
 from py4j.java_gateway import JavaGateway
+from py4j.protocol import Py4JJavaError
+import py4j
 import sys
 sys.path.append("..")  # To allow importing parent directory module
 import config
@@ -23,8 +25,14 @@ logger = logging.getLogger('core')
 _jpfLauncher = None
 _jpfProcess = None
 
+
 def createGateway():
-  # Compile and run the Java end of the gateway
+  """Compile and run the Java end of the gateway. Write any messages or
+     errors to the log file.
+
+  Returns:
+    No return value
+  """
 
   global _jpfProcess
 
@@ -67,15 +75,16 @@ def createGateway():
   error = errFile.read()
   outFile.close()
   errFile.close()
-  logger.debug("JPF Run, Output text:\n")
-  logger.debug(output)
-  logger.debug("JPF Run, Error text:\n")
-  logger.debug(error)
+  if output is not None and len(output) > 0:
+    logger.debug("JPF Run, Output text:\n")
+    logger.debug(output)
+  if error is not None and len(error) > 0:
+    logger.debug("JPF Run, Error text:\n")
+    logger.debug(error)
 
 
 def runJPF(individualID, generation):
-  """Create the JPF instance, configure it, invoke it and wait for the
-  results.
+  """Configure JPF, invoke it and wait for the results.
 
   Returns:
     No return value
@@ -84,7 +93,6 @@ def runJPF(individualID, generation):
   global _jpfLauncher
 
   # Create the local part of the gateway and connect to the Java end
-
   # auto_convert automatically converts python lists to java lists
   #logger.debug("Creating the python side of the bridge.")
   pyGateway = JavaGateway(auto_convert=True)
@@ -107,32 +115,52 @@ def runJPF(individualID, generation):
   jpfConfig[4] = 'search.depth_limit = ' + str(config._JPF_SEARCH_DEPTH)
   jpfConfig[5] = 'budget.max_time = ' + str(config._JPF_SEARCH_TIME_SEC * 1000)
   jpfConfig[6] = 'log.level = info'
-  jpfConfig[7] = 'log.output = JPFLog-test-do-i-exist-no-i-dont-why.txt'
+  jpfConfig[7] = 'log.output = JPFLog-test-do-i-exist-no-i-dont-why-dont-i-exist.txt'
   jpfConfig[8] = 'log.info = jpfLog' # Matches launchJPF.java
 
   #jpfConfig[7] = 'log.output = JPFLog-' + str(individualID) + '-' + str(generation) + '.txt'
 
   # Invoke JPF through the gateway
   logger.debug("Running JPF throught the bridge.")
-  _jpfLauncher.resetJPF()
   _jpfLauncher.setArgs(jpfConfig)
 
   try:
     _jpfLauncher.runJPF()
+  except Py4JJavaError, pyExc: #py4j.protocol.Py4JJavaError, pyExc:
+    logger.error("Encountered a py4j.protocol.Py4JJavaError. Something went")
+    logger.error("wrong on the Java side:")
+    logger.error(str(pyExc))
   except:
-    logger.error("Encountered an exception: {}".format(sys.exc_info()[0]))
+    logger.error("Encountered an exception calling runJPF():")
+    excName, excValue = sys.exc_info()[:2]
+    logger.error("{}".format(excName))
+    logger.error("{}".format(excValue))
 
 
 def shutdownJPFProcess():
+  """CORE is closing, so it is time to shut down the python-Java bridge.
+
+  TODO: Someone with a proper knowledge of sockets and py4j should
+        redo this. Killing the process is inelegant.
+
+  Returns:
+    No return value
+  """
 
   global _jpfProcess
 
   _jpfProcess.send_signal(3)
   time.sleep(1)
-  _jpfProcess.terminate()
+  #_jpfProcess.terminate()
+  _jpfProcess.kill()
 
 
 def hasJPFRun():
+  """Has JPF finished analyzing the mutant?
+
+  Returns:
+    No return value
+  """
 
   global _jpfLauncher
 
@@ -156,10 +184,10 @@ def wasADataraceFound():
     Thread-1 at NewThread.<init>(pc 24)
   "  : putstatic
 
+  Check both for signs of a data race.
+
   Returns
-    None or raceTuples (list (class, method) tuples): List of classes and methods
-      involved in the data race.
-      eg: [(Account, transfer), (Account, depsite)]
+    boolean: Was a data race found?
   """
 
   global _jpfLauncher
@@ -170,7 +198,7 @@ def wasADataraceFound():
     re.search("(\S+)\.(\S+)\((\S+)", jpfRaceStr) is not None:
     return True
 
-  jpfErrStr = getErrorString()
+  jpfErrStr = getErrorText()
   if jpfErrStr is not None and jpfErrStr.find("gov.nasa.jpf.listener.PreciseRaceDetector") > 0 \
     and re.search("(\S+)\.(\S+)\((\S+)", jpfErrStr) is not None:
     return True
@@ -179,6 +207,14 @@ def wasADataraceFound():
 
 
 def getInfoInDatarace():
+  """If wasADataraceFound(), this function creates the list of (class, method)
+  tuples involved in the race, eg: [(Account, transfer), (Account, depsite)].
+
+  Returns
+  None or raceTuples (list (class, method) tuples): List of classes and methods
+    involved in the data race.
+
+  """
 
   global _jpfLauncher
 
@@ -187,7 +223,7 @@ def getInfoInDatarace():
 
   # Cheat: Since we know that one or both of the strings in wasADataRaceFound()
   # has races, concatenate the two together and search them both at once
-  jpfRaceStr = _jpfLauncher.getDataRaceErrorMessage() + getErrorString()
+  jpfRaceStr = _jpfLauncher.getDataRaceErrorMessage() + getErrorText()
   raceTuples = []
 
   if jpfRaceStr == None: # This shouldn't happen
@@ -196,19 +232,41 @@ def getInfoInDatarace():
   # Look for class.method
   for i in range(1, 6): # Arbitrary loop count
     race = re.search("(\S+)\.(\S+)\((\S+)", jpfRaceStr)
-    if race is not None:
-      aClass = race.group(1)
-      aMeth = race.group(2)
-      if aClass is not None and aMeth is not None:
-        aTuple = (aClass, aMeth)
-        if aTuple not in raceTuples:
-          raceTuples.append(aTuple)
+    if race is None:
+      break
+
+    aClass = race.group(1)
+    aMeth = race.group(2)
+    if aClass is None or aMeth is None:
+      continue
+
+    # Loader.main and NewThread.<init> are not classes or methods
+    # from the code under test
+    if aClass.find("Loader") > 0 and aMeth.find("main") > 0:
+      continue
+    if aClass.find("NewThread") > 0 and aMeth.find("<init>") > 0:
+      continue
+
+    # The class part might be an inner class. For example, in
+    # "dog$basset" we want basset
+    inner = re.search("(\S+)\$(\S+)", aClass)
+    if inner is not None:
+      if inner.group(inner.lastindex) is None:
+        continue
+      aClass = inner.group(inner.lastindex)
+
+    aTuple = (aClass, aMeth)
+    if aTuple not in raceTuples:
+      raceTuples.append(aTuple)
 
     # Remove the class.method that was just found from the string
     if ("Thread-" in jpfRaceStr):
       jpfRaceStr =  jpfRaceStr.split("Thread-", 1)[1]
 
-  return raceTuples
+  if len(raceTuples) > 0:
+    return raceTuples
+  else:
+    return None
 
 
 def wasADeadlockFound():
@@ -242,7 +300,7 @@ def wasADeadlockFound():
 
   global _jpfLauncher
 
-  jpfDeadlockStr = getErrorString()
+  jpfDeadlockStr = getErrorText()
 
   return jpfDeadlockStr.find("NotDeadlockedProperty") > 0
 
@@ -308,7 +366,14 @@ def getStatistics():
   return _jpfLauncher.getStatistics()
 
 
-def getErrorString():
+def getErrorText():
+  """ Return a string of errors (From the program under test) generated by
+  JPF during the run. They are concatenated together in a single string.
+
+  Returns
+    String: All errors generated.
+
+  """
 
   global _jpfLauncher
 
@@ -317,10 +382,46 @@ def getErrorString():
 
 
 def getExceptionText():
+  """ Return a string of exceptions thrown by JPF itself during
+  the run. They are concatenated together in a single string.
+
+  Returns
+    String: All exceptions generated.
+
+  """
 
   global _jpfLauncher
 
   return _jpfLauncher.getExceptionText()
+
+
+def didAFatalExceptionOccur():
+  """Was an exception generated by JPF from JPF or the program
+  under test? We can filter them to determine if they are fatal
+  or not. For example,
+
+  gov.nasa.jpf.vm.NoUncaughtExceptionsProperty java.lang.NullPointerException:
+  Attempt to acquire lock for null object
+
+  Is fatal. Right now, every exception is fatal. Non-fatal
+  can be added here as they are found.
+
+    Returns
+      boolean: Was an exception found?
+
+  """
+
+  excTxt = getErrorText() + " " + getExceptionText()
+
+  fatExc = re.search("gov\.nasa\.jpf\.(\S+)Exception", excTxt)
+  if fatExc is not None:
+    return True
+
+  fatExc = re.search("java\.(\S+)Exception", excTxt)
+  if fatExc is not None:
+    return True
+
+  return False
 
 
 def timeExceeded():
@@ -328,7 +429,7 @@ def timeExceeded():
   config._JPF_SEARCH_TIME_SEC seconds?
 
   Returns
-    (boolean): Did we run out of time?
+    boolean: Did we run out of time?
   """
   global _jpfLauncher
 
@@ -339,7 +440,7 @@ def depthLimitReached():
   """ Did we reach the depth limit of config.JPF_SEARCH_DEPTH?
 
   Returns:
-    (boolean): Did we reach the depth limit?
+    boolean: Did we reach the depth limit?
   """
 
   global _jpfLauncher
@@ -353,15 +454,18 @@ def outOfMemory():
   reported an out of memory exception.
 
   Returns:
-    (boolean): Did it?
+    boolean: Did it?
   """
 
   global _jpfLauncher
 
-  errStr = getErrorString()
+  errStr = getErrorText()
   if errStr is not None and errStr.find("gov.nasa.jpf.vm.NoOutOfMemoryErrorProperty") > 0:
     return True
 
   excStr = getExceptionText()
   if excStr is not None and excStr.find("out-of-memory termination") > 0:
     return True
+
+
+

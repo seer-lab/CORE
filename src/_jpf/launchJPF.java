@@ -32,19 +32,6 @@ public class launchJPF {
     args = inArgs;
   }
 
-  public void resetJPF() {
-    args = null;
-    myJPF = null;
-    conf = null;
-    jpfRaceDetector = null;
-    jpfDeadlockAn = null;
-    jpfBudgetChecker = null;
-    jpfHasRun = false;
-    exceptionText = "";
-    // Lets be really, really sure any old objects are gone!
-    System.gc();
-  }
-
   public void runJPF() {
     if (args == null) {
       log.info("launchJPF.java, runJPF: Set args before calling runJPF.");
