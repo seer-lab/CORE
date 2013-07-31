@@ -247,7 +247,12 @@ class Tester():
 
               self.realTime.append(float(userTime) + float(systemTime))
               self.voluntarySwitches.append(float(voluntarySwitches))
-
+        else:
+          logger.error("Test {} - Something unexpected has happened. We haven't been")
+          logger.error("able to determine what happened for this test.")
+          logger.error("marking this test as successful and moving on.")
+          self.successes += 1
+          self.goodRuns.append(True)
     # If ConTest hasn't given us a list of (class.variable) involved in concurrency
     # yet, we keep looking for it.
     # Getting the ConTest information may allow us to fill the config.finalCMV list with
