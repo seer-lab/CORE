@@ -823,7 +823,7 @@ def evaluate_modelcheck(individual, generation):
 
     raceFound = run_jpf.wasADataraceFound()
     raceResult = run_jpf.getInfoInDatarace()
-    if raceResult != None:
+    if raceResult is not None:
       static.add_JPF_race_list(raceResult)
       #logger.debug("Adding JPF race list to search targets: {}".format(raceResult))
     logger.debug("Datarace found: {}".format(raceFound))
@@ -831,7 +831,7 @@ def evaluate_modelcheck(individual, generation):
 
     lockFound = run_jpf.wasADeadlockFound()
     lockResult = run_jpf.getClassesInDeadlock()
-    if lockResult != None:
+    if lockResult is not None:
       static.add_JPF_lock_list(lockResult)
       #logger.debug("Adding JPF lock list to search targets: {}".format(lockResult))
     logger.debug("Deadlock found: {}".format(lockFound))
@@ -892,6 +892,7 @@ def evaluate_modelcheck(individual, generation):
       logger.debug("This program might be correct (?)")
       logger.debug("This mutant will be evaluated by ConTest.")
       return True
+
   except:
     logger.error("Encountered an exception calling evaluate_modelcheck:")
     excName, excValue = sys.exc_info()[:2]
@@ -900,6 +901,11 @@ def evaluate_modelcheck(individual, generation):
   finally:
     logger.debug("Shutting down the Java/JPF side of the bridge.")
     run_jpf.shutdownJPFProcess()
+
+  logger.debug("We've reached the bottom of the evaluate_modelcheck function.")
+  logger.debug("This mutant doesn't appear to have been evaluated yet.")
+  logger.debug("It is being sent to ConTest.")
+  return True
 
 
 def evaluate_contest(individual):  #, worstScore):
