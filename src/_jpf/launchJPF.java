@@ -185,7 +185,12 @@ public class launchJPF {
 
     // From  src/.../jpf/listener/BudgetChecker.java
     // NB: Submitted a bug report for this class, JPF 7, ver 1077
-    return false;  //jpfBudgetChecker.timeExceeded();
+    gov.nasa.jpf.listener.BudgetChecker buCh = null;
+    buCh = myJPF.getListenerOfType(BudgetChecker.class);
+    if (buCh != null)
+      return buCh.timeExceeded();
+    else
+      return false;
   }
 
   public static void main(String[] args) {

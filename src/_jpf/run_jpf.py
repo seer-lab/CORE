@@ -41,10 +41,12 @@ def createGateway():
 
   # Compile src/_jpf/launchJPF.java, which creates and runs the JPF session
   logger.debug("Compiling _jpf/launchJPF.java.")
-  process = subprocess.Popen(['javac', '-cp', ".:" + config._JPF_JAR + ":" +
-    config._PY4J_JAR, 'launchJPF.java'], stdout=outFile,
+  process = subprocess.Popen(['javac', '-cp', ".:" + config._JPF_JAR
+    + ":" + config._PY4J_JAR, 'launchJPF.java'], stdout=outFile,
     stderr=errFile, cwd=config._JPF_DIR, shell=False)
   process.wait()
+  #+ ":" + os.path.join(CONFIG._ROOT_DIR, "/lib/JPF/build/jpf-annotations.jar")
+  #+ ":" + os.path.join(CONFIG._ROOT_DIR, "/lib/JPF/build/jpf-classes.jar")
 
   # Debugging
   # outFile.seek(0)
@@ -111,10 +113,10 @@ def runJPF(individualID, generation):
   jpfConfig[0] = config._JPF_CONFIG  # The .jpf file
   jpfConfig[1] = '+classpath=' + config._PROJECT_CLASS_DIR
   jpfConfig[2] = '+sourcepath=' + config._PROJECT_SRC_DIR
-  jpfConfig[3] = 'search.class = gov.nasa.jpf.search.BFSearch'
-  jpfConfig[4] = 'search.depth_limit = ' + str(config._JPF_SEARCH_DEPTH)
-  jpfConfig[5] = 'listener += gov.nasa.jpf.listener.BudgetChecker,'
-  jpfConfig[6] = 'budget.max_time = ' + str(config._JPF_SEARCH_TIME_SEC * 1000)
+  jpfConfig[3] = '+search.class = gov.nasa.jpf.search.heuristic.BFSHeuristic'
+  jpfConfig[4] = '+search.depth_limit = ' + str(config._JPF_SEARCH_DEPTH)
+  jpfConfig[5] = '+listener = gov.nasa.jpf.listener.BudgetChecker,'
+  jpfConfig[6] = '+budget.max_time = ' + str(config._JPF_SEARCH_TIME_SEC * 1000)
   jpfConfig[7] = '+log.level = info'
   jpfConfig[8] = '+log.output = jpfLog.txt'
   jpfConfig[9] = '+log.info = jpfLog' # Matches launchJPF.java
