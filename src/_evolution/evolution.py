@@ -196,9 +196,7 @@ def start():
 
   except:
     logger.error("Unexpected error:\n", traceback.print_exc(file=sys.stdout))
-  finally:
-    logger.info("Shutting down the Java/JPF side of the bridge")
-    run_jpf.shutdownJPFProcess()
+  #finally:
 
 
 def evolve(generation=0, worstScore=0):
@@ -767,8 +765,6 @@ def evaluate_modelcheck(individual, generation):
   logger.info("Evaluating individual {}, generation {} with JPF".
     format(individual.id, individual.generation))
 
-  # Create the gateway once
-  #if (individual.id == 1 and generation == 1):
   try:
     logger.debug("Creating gateway.")
     run_jpf.createGateway()
@@ -789,6 +785,12 @@ def evaluate_modelcheck(individual, generation):
     # Deal with specific problems
     if run_jpf.outOfMemory():
       logger.error("JPF ran out of memory. This mutant will be evaluated by ConTest.")
+      #_useJPF = False
+      return True
+
+    # Deal with specific problems
+    if run_jpf.timeExceeded():
+      logger.error("JPF ran out of time. This mutant will be evaluated by ConTest.")
       #_useJPF = False
       return True
 
@@ -840,7 +842,7 @@ def evaluate_modelcheck(individual, generation):
     ranOutOfTime = run_jpf.timeExceeded()
     logger.debug("Ran out of time ({}s): {}".format(config._JPF_SEARCH_TIME_SEC, ranOutOfTime))
 
-    depthLimitReached = run_jpf.depthLimitReached()
+    depthLimitReached = stats[0] >= config._JPF_SEARCH_DEPTH
     logger.debug("Depth limit ({}) reached: {}".format(config._JPF_SEARCH_DEPTH, depthLimitReached))
 
     maxFitness = config._CONTEST_RUNS * config._SUCCESS_WEIGHT
@@ -899,7 +901,7 @@ def evaluate_modelcheck(individual, generation):
     logger.error("{}".format(excName))
     logger.error("{}".format(excValue))
   finally:
-    logger.debug("Shutting down the Java/JPF side of the bridge.")
+    logger.debug("Shutting down JPF.")
     run_jpf.shutdownJPFProcess()
 
   logger.debug("We've reached the bottom of the evaluate_modelcheck function.")

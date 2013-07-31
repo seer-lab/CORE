@@ -107,28 +107,28 @@ def runJPF(individualID, generation):
   #       Instead, create them in the launchJPF.java class and add them
   #       to JPF there. (See BudgetChecker as an example.)
 
-  jpfConfig = pyGateway.new_array(pyGateway.jvm.java.lang.String, 9)
+  jpfConfig = pyGateway.new_array(pyGateway.jvm.java.lang.String, 10)
   jpfConfig[0] = config._JPF_CONFIG  # The .jpf file
   jpfConfig[1] = '+classpath=' + config._PROJECT_CLASS_DIR
   jpfConfig[2] = '+sourcepath=' + config._PROJECT_SRC_DIR
   jpfConfig[3] = 'search.class = gov.nasa.jpf.search.BFSearch'
   jpfConfig[4] = 'search.depth_limit = ' + str(config._JPF_SEARCH_DEPTH)
-  jpfConfig[5] = 'budget.max_time = ' + str(config._JPF_SEARCH_TIME_SEC * 1000)
-  jpfConfig[6] = 'log.level = info'
-  jpfConfig[7] = 'log.output = jpfLog.txt'
-  jpfConfig[8] = 'log.info = jpfLog' # Matches launchJPF.java
+  jpfConfig[5] = 'listener += gov.nasa.jpf.listener.BudgetChecker,'
+  jpfConfig[6] = 'budget.max_time = ' + str(config._JPF_SEARCH_TIME_SEC * 1000)
+  jpfConfig[7] = '+log.level = info'
+  jpfConfig[8] = '+log.output = jpfLog.txt'
+  jpfConfig[9] = '+log.info = jpfLog' # Matches launchJPF.java
 
   #jpfConfig[7] = 'log.output = JPFLog-' + str(individualID) + '-' + str(generation) + '.txt'
 
   # Invoke JPF through the gateway
-  logger.debug("Running JPF throught the bridge.")
+  logger.debug("Running JPF.")
   _jpfLauncher.setArgs(jpfConfig)
 
   try:
     _jpfLauncher.runJPF()
   except Py4JJavaError, pyExc: #py4j.protocol.Py4JJavaError, pyExc:
-    logger.error("Encountered a py4j.protocol.Py4JJavaError. Something went")
-    logger.error("wrong on the Java side:")
+    logger.error("Encountered a py4j.protocol.Py4JJavaError.")
     logger.error(str(pyExc))
   except:
     logger.error("Encountered an exception calling runJPF():")
@@ -400,18 +400,6 @@ def timeExceeded():
   global _jpfLauncher
 
   return _jpfLauncher.timeExceeded()
-
-
-def depthLimitReached():
-  """ Did we reach the depth limit of config.JPF_SEARCH_DEPTH?
-
-  Returns:
-    boolean: Did we reach the depth limit?
-  """
-
-  global _jpfLauncher
-
-  return _jpfLauncher.depthLimitReached()
 
 
 def outOfMemory():

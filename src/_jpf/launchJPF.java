@@ -20,7 +20,7 @@ public class launchJPF {
     Config conf;
     PreciseRaceDetector jpfRaceDetector;
     DeadlockAnalyzer jpfDeadlockAn;
-    BudgetChecker jpfBudgetChecker;
+    //BudgetChecker jpfBudgetChecker;
     Boolean jpfHasRun;
 
   public launchJPF(String[] inArgs) {
@@ -59,9 +59,10 @@ public class launchJPF {
       myJPF.addVMListener(jpfDeadlockAn);
 
       // ----- Budget Checker
-      jpfBudgetChecker = new BudgetChecker(conf, myJPF);
-      myJPF.addSearchListener(jpfBudgetChecker);
-      myJPF.addVMListener(jpfBudgetChecker);
+      //jpfBudgetChecker = new BudgetChecker(conf, myJPF);
+      //conf.setProperty("+budget.max_time", "1000");
+      //myJPF.addSearchListener(jpfBudgetChecker);
+      //myJPF.addVMListener(jpfBudgetChecker);
 
       log.info("Starting JPF run");
       myJPF.run();
@@ -184,16 +185,7 @@ public class launchJPF {
 
     // From  src/.../jpf/listener/BudgetChecker.java
     // NB: Submitted a bug report for this class, JPF 7, ver 1077
-    return jpfBudgetChecker.timeExceeded();
-  }
-
-  public boolean depthLimitReached() {
-    if (!jpfHasRun)
-      return false;
-
-    // From  src/.../jpf/search/Search.java
-    gov.nasa.jpf.search.Search jpfSearch = myJPF.getSearch();
-    return jpfSearch.getDepth() >= jpfSearch.getDepthLimit();
+    return false;  //jpfBudgetChecker.timeExceeded();
   }
 
   public static void main(String[] args) {
