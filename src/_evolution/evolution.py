@@ -839,9 +839,6 @@ def evaluate_modelcheck(individual, generation):
     logger.debug("Deadlock found: {}".format(lockFound))
     logger.debug("Deadlock data: {}".format(lockResult))
 
-    ranOutOfTime = run_jpf.timeExceeded()
-    logger.debug("Ran out of time ({}s): {}".format(config._JPF_SEARCH_TIME_SEC, ranOutOfTime))
-
     depthLimitReached = stats[0] >= config._JPF_SEARCH_DEPTH
     logger.debug("Depth limit ({}) reached: {}".format(config._JPF_SEARCH_DEPTH, depthLimitReached))
 
@@ -849,12 +846,6 @@ def evaluate_modelcheck(individual, generation):
     logger.debug("Max fitness: {}".format(maxFitness))
 
     # Deep breath. If we've made it this far, we can attempt to make sense of the results
-
-    if ranOutOfTime:
-      logger.debug("The JPF evalutation ran out of time.")
-      logger.debug("This mutant will be evaluated by ConTest.")
-      #_useJPF = False
-      return True
 
     if depthLimitReached and (raceFound or lockFound):
       logger.debug("We've reached the configured depth limit, {}.".format(config._JPF_SEARCH_DEPTH))

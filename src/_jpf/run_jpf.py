@@ -166,7 +166,7 @@ def wasADataraceFound():
   Thread-2 at Account.depsite(pc 2)
    : getfield
 
-  The second is from the error text (why?):
+  The second is from the error text (why?).
 
   gov.nasa.jpf.listener.PreciseRaceDetector race for field NewThread.endd
     main at Loader.main(pc 135)
@@ -191,7 +191,14 @@ def wasADataraceFound():
   jpfErrStr = getErrorText()
   if jpfErrStr is not None and "gov.nasa.jpf.listener.PreciseRaceDetector" in jpfErrStr \
     and re.search("(\S+)\.(\S+)\((\S+)", jpfErrStr) is not None:
-    return True
+    # Loader.main and NewThread.<init> are not classes and methods in the user
+    # code of the Java program under test. As far as CORE is concerned, these
+    # entries are false reports that are not considered. Unless there is some
+    # other problem, ConTest will (hopefully) perform the evaluation.
+    if "Loader.main" in jpfErrStr and "NewThread.<init>" in jpfErrStr:
+      return False
+    else:
+      return True
 
   return False
 
@@ -231,7 +238,7 @@ def getInfoInDatarace():
       continue
 
     # Loader.main and NewThread.<init> are not classes or methods
-    # from the code under test
+    # from the code under test. See wasADataRaceFound() for details
     if "Loader" in aClass and "main" in aMeth:
       continue
     if "NewThread"in aClass and "<init>" in aMeth:

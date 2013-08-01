@@ -6,33 +6,47 @@ Copyright ARC, David Kelk and Kevin Jalbert, 2012
           ARC, CORE, David Kelk, 2013
 """
 
+import os
+import os.path
+import shutil
+
+# Convenience code
+# Look for input/config.py and copy it to src so it doesn't
+# have to be done manually every time
+srcConfig = os.path.join("..", "input", "config.py")
+if os.path.exists(srcConfig):
+  if os.path.exists("config.py"):
+    os.remove("config.py")
+  if os.path.exists("config.pyc"):
+    os.remove("config.pyc")
+  shutil.copy(srcConfig, ".")
+
 import config
 import argparse
 import subprocess
 import tempfile
 import re
-import shutil
-import os
-import os.path
 import sys
 from _contest import contester
 from _evolution import evolution
 from _txl import txl_operator
 from _evolution import static
-#from _jpf import run_jpf
 import fileinput
 # Send2Trash from https://pypi.python.org/pypi/Send2Trash
-# Details on its use is in step 9 below
 from send2trash import send2trash
 
 import logging
 logger = logging.getLogger('core')
 
+_OS = "MAC"
+
 def main():
   """The entry point to CORE, to start the evolutionary approach."""
 
+  global _OS
+
   restart = False
-  # 1. Set config._ROOT_DIR - as it is needed by everything!
+  # Set config._ROOT_DIR - as it is needed by everything!
   if config._ROOT_DIR != os.path.split(os.getcwd())[0] + os.sep:
     logger.info("Configuring _ROOT_DIR in config.py")
     configRoot = fileinput.FileInput(files=('config.py'), inplace=1)
@@ -49,8 +63,8 @@ def main():
     python = sys.executable
     os.execl(python, python, * sys.argv)
 
-  # 2. With _ROOT_DIR configured, we can determine the operating system,
-  # config._OS we are running on.
+  # With _ROOT_DIR configured, we can determine the operating system,
+  # _OS we are running on.
   # One way to do this is to use the 'uname' command:
   # - On Linux, 'uname -o' returns 'GNU/Linux'
   # - On Mac, 'uname -o' isn't recognized. 'uname' returns 'Darwin'
@@ -69,48 +83,23 @@ def main():
   outFile.close()
   ourOS = 0 # 10 is Mac, 20 is Linux
   if re.search("Linux", outText):
-    ourOS = 20 # Linux
+    _OS = "LINUX"
   else:
-    ourOS = 10 # Mac
+    _OS = "MAC"
 
-  # 3. Set config._OS
-  restart = False
-  logger.info("Configuring _OS in config.py")
-  if (config._OS == "MAC" and ourOS == 20) or (config._OS == "LINUX" and ourOS == 10):
-    configOS = fileinput.FileInput(files=('config.py'), inplace=1)
-    for line in configOS:
-      if line.find("_OS =") is 0 or line.find("_OS=") is 0:
-        if ourOS == 10: # Mac
-          line = "_OS = \"MAC\" " # Note the extra space at the end
-        else: # Linux
-          line = "_OS = \"LINUX\" "
-      print(line[0:-1]) # Remove extra newlines (a trailing-space must exists in modified lines)
-    configOS.close()
-    restart = True
-
-  if restart:
-    if ourOS == 20:
-      outText = "Linux"
-    else:
-      outText = "MAC"
-    print("Config's _OS changed to {}. Restarting.".format(outText))
-    logger.info("Config's _OS changed to {}. Restarting.".format(outText))
-    python = sys.executable
-    os.execl(python, python, * sys.argv)
-
-  # 4. Compile the project
+  # Compile the project
   if os.path.exists(config._PROJECT_DIR):
     shutil.rmtree(config._PROJECT_DIR)
   shutil.copytree(config._PROJECT_PRISTINE_DIR, config._PROJECT_DIR)
 
   txl_operator.compile_project()
 
-  # 5. Set up ConTest (Thread noising tool)
+  # Set up ConTest (Thread noising tool)
   contester.setup()
-  # 6. Set up Chord (A static analysis tool)
+  # Set up Chord (A static analysis tool)
   static.setup()
 
-  # 7. Acquire classpath dynamically using 'ant test'
+  # Acquire classpath dynamically using 'ant test'
   if config._PROJECT_CLASSPATH is None:
     outFile = tempfile.SpooledTemporaryFile()
     errFile = tempfile.SpooledTemporaryFile()
@@ -152,7 +141,7 @@ def main():
     config._PROJECT_CLASSPATH = re.search("-classpath'\s*\[junit\]\s*'(.*)'",
       outText).groups()[0]
 
-  # 8. Acquire dynamic timeout value from ConTest
+  # Acquire dynamic timeout value from ConTest
   contestTime = contester.run_test_execution(20)
   # Too many runs is overkill
   #contestTime = contester.run_test_execution(config._CONTEST_RUNS *
@@ -160,7 +149,7 @@ def main():
   config._CONTEST_TIMEOUT_SEC = contestTime * config._CONTEST_TIMEOUT_MULTIPLIER
   logger.info("Using a timeout value of {}s".format(config._CONTEST_TIMEOUT_SEC))
 
-  # 9. Clean up the temporary directory (Probably has subdirs from previous runs)
+  # Clean up the temporary directory (Probably has subdirs from previous runs)
   logger.info("Cleaning TMP directory")
   # Cleaning up a previous run could take half an hour on the mac
   # (10,000+ files is slow)
@@ -174,10 +163,9 @@ def main():
     os.makedirs(config._TMP_DIR)
   else:
     send2trash(config._TMP_DIR)
-    #shutil.rmtree(config._TMP_DIR) Native python, slow
     os.makedirs(config._TMP_DIR)
 
-  # 10. Run the static analysis
+  # Run the static analysis
   static.configure_chord()
   static.run_chord_datarace()
   static.get_chord_targets()
@@ -185,7 +173,7 @@ def main():
   static.create_merged_classVar_list()
   static.create_final_triple()
 
-  # 11. Start the main bug-fixing procedure
+  # Start the main bug-fixing procedure
   evolution.start()
 
 # If this module is ran as main

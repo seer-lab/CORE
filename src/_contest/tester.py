@@ -55,6 +55,8 @@ class Tester():
   def begin_testing(self, functional, exitOnFail = False, runs=config._CONTEST_RUNS):
     """Begins the testing phase by creating the test processes."""
 
+    global _OS
+
     # Delete old ConTest longs.  Thousands can accumulate if this isn't done regularly
     conTestLogDir = os.path.join(config._PROJECT_DIR, 'com_ibm_contest', 'instLogs')
     if os.path.exists(conTestLogDir):
@@ -79,7 +81,8 @@ class Tester():
       else:
         # MAC uses a different time argument then Linux
         # http://developer.apple.com/library/mac/#documentation/Darwin/Reference/ManPages/man1/time.1.html
-        if config._OS is 'MAC':
+        #if config._OS is 'MAC':
+        if _OS is 'MAC':
           timeArg = '-lp' # BSD-style
         else:
           timeArg = '-v'  # Linux-style
@@ -236,7 +239,8 @@ class Tester():
             self.goodRuns.append(True)
 
             if not functional:
-              if config._OS is 'MAC':
+              if _OS is 'MAC':
+              #if config._OS is 'MAC':
                 userTime = re.search("user \s+ (\d+\.\d+)", error).groups()[0]
                 systemTime = re.search("sys \s+ (\d+\.\d+)", error).groups()[0]
                 voluntarySwitches = re.search("(\d+)\s+ voluntary context switches", error).groups()[0]

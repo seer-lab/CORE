@@ -481,12 +481,13 @@ def clean_up_mutants(generation, memberNum):
     config._NONFUNCTIONAL_MUTATIONS}
   """
 
-  cleanDir = os.path.join(config._TMP_DIR, str(generation), str(memberNum))
+  cleanDir = os.path.join(config._TMP_DIR, str(generation), str(memberNum), "source")
 
-  for root, dirs, files in os.walk(cleanDir):
-    for aDir in dirs:
-      if aDir <> "project":
-        send2trash(os.path.join(root, aDir))
+  send2trash(cleanDir);
+  #for root, dirs, files in os.walk(cleanDir):
+  #  for aDir in dirs:
+  #    if aDir <> "project":
+  #      send2trash(os.path.join(root, aDir))
 
 # -----------------------------------------------------------------------------
 #
