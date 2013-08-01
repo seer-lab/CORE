@@ -9,8 +9,20 @@ Copyright ARC, David Kelk and Kevin Jalbert, 2012
 import os
 import os.path
 import shutil
+import fileinput
 
 # Convenience code
+# Make sure config._ROOT_DIR is set correctly.  This is a problem
+# when CORE is run on different machines at the same time.
+coreDir = os.path.split(os.getcwd())[0] + os.sep
+srcConfig = os.path.join("..", "input", "config.py")
+configRoot = fileinput.FileInput(files=(srcConfig), inplace=1)
+for line in configRoot:
+  if line.find("_ROOT_DIR =") is 0:
+    line = "_ROOT_DIR = \"{}\" ".format(coreDir)
+  print(line[0:-1]) # Remove extra newlines (a trailing-space must exists in modified lines)
+configRoot.close()
+
 # Look for input/config.py and copy it to src so it doesn't
 # have to be done manually every time
 srcConfig = os.path.join("..", "input", "config.py")
@@ -31,7 +43,6 @@ from _contest import contester
 from _evolution import evolution
 from _txl import txl_operator
 from _evolution import static
-import fileinput
 # Send2Trash from https://pypi.python.org/pypi/Send2Trash
 from send2trash import send2trash
 
@@ -45,34 +56,14 @@ def main():
 
   global _OS
 
-  restart = False
-  # Set config._ROOT_DIR - as it is needed by everything!
-  if config._ROOT_DIR != os.path.split(os.getcwd())[0] + os.sep:
-    logger.info("Configuring _ROOT_DIR in config.py")
-    configRoot = fileinput.FileInput(files=('config.py'), inplace=1)
-    for line in configRoot:
-      if line.find("_ROOT_DIR =") is 0:
-        line = "_ROOT_DIR = \"{}\" ".format(os.path.split(os.getcwd())[0] + os.sep)
-      print(line[0:-1]) # Remove extra newlines (a trailing-space must exists in modified lines)
-    configRoot.close()
-    restart = True
-
-  if restart:
-    print("Config's _ROOT_DIR changed to {}. Restarting.".format(config._ROOT_DIR))
-    logger.info("Config's _ROOT_DIR changed to {}. Restarting.".format(config._ROOT_DIR))
-    python = sys.executable
-    os.execl(python, python, * sys.argv)
-
-  # With _ROOT_DIR configured, we can determine the operating system,
-  # _OS we are running on.
-  # One way to do this is to use the 'uname' command:
-  # - On Linux, 'uname -o' returns 'GNU/Linux'
-  # - On Mac, 'uname -o' isn't recognized. 'uname' returns 'Darwin'
-
   # Check for the workarea directory
   if not os.path.exists(config._PROJECT_DIR):
     os.makedirs(config._PROJECT_DIR)
 
+  # Different operating systems implement some commands differently, so we
+  # have to plan for that as it comes up. So far, we've found that MAC and
+  # LINUX implement the time command differently. Therefore, determine which
+  # OS we're running on.
   outFile = tempfile.SpooledTemporaryFile()
   errFile = tempfile.SpooledTemporaryFile()
   helpProcess = subprocess.Popen(['uname', '-o'], stdout=outFile, stderr=errFile,
@@ -142,10 +133,8 @@ def main():
       outText).groups()[0]
 
   # Acquire dynamic timeout value from ConTest
+  # CORE still uses ConTest, so this stays.
   contestTime = contester.run_test_execution(20)
-  # Too many runs is overkill
-  #contestTime = contester.run_test_execution(config._CONTEST_RUNS *
-  #  config._CONTEST_VALIDATION_MULTIPLIER)
   config._CONTEST_TIMEOUT_SEC = contestTime * config._CONTEST_TIMEOUT_MULTIPLIER
   logger.info("Using a timeout value of {}s".format(config._CONTEST_TIMEOUT_SEC))
 
