@@ -506,7 +506,7 @@ def create_local_project(generation, memberNum, restart, switchGeneration=0):
   pristine original.  This is the 'restart' parameter - a boolean.
 
   Attributes:
-  generation (int): Current generation of the evolutionary strategy
+  generation (int): Current generation of the GAnotC
   memberNum (int): Which member of the population we are dealing with
   restart (boolean): Do we want to reset the member project back to the pristine one?
   """

@@ -26,7 +26,7 @@ _jpfLauncher = None
 _jpfProcess = None
 
 
-def createGateway():
+def createGateway(individualID, generation):
   """Compile and run the Java end of the gateway. Write any messages or
      errors to the log file.
 
@@ -39,26 +39,29 @@ def createGateway():
   outFile = tempfile.SpooledTemporaryFile()
   errFile = tempfile.SpooledTemporaryFile()
 
-  # Compile src/_jpf/launchJPF.java, which creates and runs the JPF session
-  logger.debug("Compiling _jpf/launchJPF.java.")
-  process = subprocess.Popen(['javac', '-cp', ".:" + config._JPF_JAR
-    + ":" + config._PY4J_JAR, 'launchJPF.java'], stdout=outFile,
-    stderr=errFile, cwd=config._JPF_DIR, shell=False)
-  process.wait()
-  #+ ":" + os.path.join(CONFIG._ROOT_DIR, "/lib/JPF/build/jpf-annotations.jar")
-  #+ ":" + os.path.join(CONFIG._ROOT_DIR, "/lib/JPF/build/jpf-classes.jar")
 
-  # Debugging
-  # outFile.seek(0)
-  # errFile.seek(0)
-  # output = outFile.read()
-  # error = errFile.read()
-  # outFile.close()
-  # errFile.close()
-  # logger.debug("Compile, Output text:\n")
-  # logger.debug(output)
-  # logger.debug("Compile, Error text:\n")
-  # logger.debug(error)
+  # Compile src/_jpf/launchJPF.java, which creates and runs the JPF session
+  # Do this once per run
+  if individualID is 1 and generation is 1:
+    logger.debug("Compiling _jpf/launchJPF.java.")
+    process = subprocess.Popen(['javac', '-cp', ".:" + config._JPF_JAR
+      + ":" + config._PY4J_JAR, 'launchJPF.java'], stdout=outFile,
+      stderr=errFile, cwd=config._JPF_DIR, shell=False)
+    process.wait()
+    #+ ":" + os.path.join(CONFIG._ROOT_DIR, "/lib/JPF/build/jpf-annotations.jar")
+    #+ ":" + os.path.join(CONFIG._ROOT_DIR, "/lib/JPF/build/jpf-classes.jar")
+
+    # Debugging
+    # outFile.seek(0)
+    # errFile.seek(0)
+    # output = outFile.read()
+    # error = errFile.read()
+    # outFile.close()
+    # errFile.close()
+    # logger.debug("Compile, Output text:\n")
+    # logger.debug(output)
+    # logger.debug("Compile, Error text:\n")
+    # logger.debug(error)
 
   outFile = tempfile.SpooledTemporaryFile()
   errFile = tempfile.SpooledTemporaryFile()
@@ -85,7 +88,7 @@ def createGateway():
     logger.debug(error)
 
 
-def runJPF(individualID, generation):
+def runJPF():
   """Configure JPF, invoke it and wait for the results.
 
   Returns:
@@ -180,22 +183,22 @@ def wasADataraceFound():
     boolean: Was a data race found?
   """
 
-  global _jpfLauncher
+  excText = getBothErrorTexts()
+  if excText is None:
+    return False
 
-  jpfRaceStr = _jpfLauncher.getDataRaceErrorMessage()
-  if jpfRaceStr is not None and "putfield" in jpfRaceStr \
-    and "getfield" in jpfRaceStr and \
-    re.search("(\S+)\.(\S+)\((\S+)", jpfRaceStr) is not None:
+  if excText is not None and excText.find("putfield") > 0  \
+    and excText.find("getfield") > 0 \
+    and re.search("(\S+)\.(\S+)\((\S+)", excText) is not None:
     return True
 
-  jpfErrStr = getErrorText()
-  if jpfErrStr is not None and "gov.nasa.jpf.listener.PreciseRaceDetector" in jpfErrStr \
-    and re.search("(\S+)\.(\S+)\((\S+)", jpfErrStr) is not None:
+  if excText is not None and excText.find("gov.nasa.jpf.listener.PreciseRaceDetector") > 0 \
+    and re.search("(\S+)\.(\S+)\((\S+)", excText) is not None:
     # Loader.main and NewThread.<init> are not classes and methods in the user
     # code of the Java program under test. As far as CORE is concerned, these
     # entries are false reports that are not considered. Unless there is some
     # other problem, ConTest will (hopefully) perform the evaluation.
-    if "Loader.main" in jpfErrStr and "NewThread.<init>" in jpfErrStr:
+    if excText.find("Loader.main") > 0 and excText.find("NewThread.<init>") > 0:
       return False
     else:
       return True
@@ -213,14 +216,12 @@ def getInfoInDatarace():
 
   """
 
-  global _jpfLauncher
-
   if not wasADataraceFound():
     return None
 
   # Cheat: Since we know that one or both of the strings in wasADataRaceFound()
   # has races, concatenate the two together and search them both at once
-  jpfRaceStr = _jpfLauncher.getDataRaceErrorMessage() + getErrorText()
+  jpfRaceStr = getBothErrorTexts()
   raceTuples = []
 
   if jpfRaceStr == None: # This shouldn't happen
@@ -239,9 +240,9 @@ def getInfoInDatarace():
 
     # Loader.main and NewThread.<init> are not classes or methods
     # from the code under test. See wasADataRaceFound() for details
-    if "Loader" in aClass and "main" in aMeth:
+    if aClass.find("Loader") > 0 and aMeth.find("main") > 0:
       continue
-    if "NewThread"in aClass and "<init>" in aMeth:
+    if aClass.find("NewThread") > 0 and aMeth.find("<init>") > 0:
       continue
 
     # The class part might be an inner class. For example, in
@@ -257,7 +258,7 @@ def getInfoInDatarace():
       raceTuples.append(aTuple)
 
     # Remove the class.method that was just found from the string
-    if ("Thread-" in jpfRaceStr):
+    if (jpfRaceStr.find("Thread-") > 0):
       jpfRaceStr =  jpfRaceStr.split("Thread-", 1)[1]
 
   if len(raceTuples) > 0:
@@ -295,14 +296,12 @@ def wasADeadlockFound():
     deadlockFound (boolean): Was a deadlock found?
   """
 
-  global _jpfLauncher
-
-  jpfDeadlockStr = getErrorText()
+  jpfDeadlockStr = getBothErrorTexts()
 
   if jpfDeadlockStr is None:
     return False
 
-  return "NotDeadlockedProperty" in jpfDeadlockStr
+  return jpfDeadlockStr.find("NotDeadlockedProperty") > 0
 
 
 def getClassesInDeadlock():
@@ -315,13 +314,11 @@ def getClassesInDeadlock():
                             eg: ('DiningPhil', 'Philosopher')
   """
 
-  global _jpfLauncher
-
-  jpfDeadlockStr = _jpfLauncher.getDeadlockErrorMessage()
+  jpfDeadlockStr = getBothErrorTexts()
   if jpfDeadlockStr is None:
     return None
 
-  if  "NotDeadlockedProperty" not in jpfDeadlockStr and \
+  if  jpfDeadlockStr.find("NotDeadlockedProperty") < 0 and \
     re.search("(\S+)\$(\S+):\{", jpfDeadlockStr) is None:
     return None
 
@@ -338,19 +335,57 @@ def getClassesInDeadlock():
         lockList.append(aClass2)
 
     # Remove the class.method that was just found from the string
-    if ("suspendCount" in jpfDeadlockStr):
+    if (jpfDeadlockStr.find("suspendCount") > 0):
       jpfDeadlockStr =  jpfDeadlockStr.split("suspendCount", 1)[1]
 
   return lockList
 
 
-def didAFatalExceptionOccur():
-  """Was an exception generated by JPF from JPF or the program
-  under test? We can filter them to determine if they are fatal
-  or not. For example,
+def checkForKnownIssues():
+  """NOTE: Run this before didAFatalExceptionOccur()
 
-  gov.nasa.jpf.vm.NoUncaughtExceptionsProperty java.lang.NullPointerException:
+  There are some issues we have to deal with:
+
+  Synchronizing on an object before it is created leads to compilable
+  code (in atleast some cases):
+
+  protected long [] generated = null;
+  ...
+  synchronized (generated) {
+    generated = new long [numOfUsers];
+  }
+
+  BUT, JPF will always throw an error:
+
+  gov.nasa.jpf.vm.NoUncaughtExceptionsProperty
+  java.lang.NullPointerException:
   Attempt to acquire lock for null object
+
+  Why do we care? Because any fix found in future generations will be
+  HIDDEN by this exception. JPF will keep throwing this error in every
+  future generation after this occurs.  In this case, we reset the
+  member and try again the next generation.
+  (For the lottery test program, this was occuring 2-3 times per
+  generation, on average.)
+
+  """
+
+  excText = getBothErrorTexts()
+  if excText is None:
+    return None
+
+  if excText.find("Attempt to acquire lock for null object") > 0:
+    return "attemptNullObjectLock"
+
+  return None
+
+
+def didAFatalExceptionOccur():
+  """NOTE: Make sure checkForKnownIssues() is run first.
+
+  Was an exception generated by JPF from JPF or the program
+  under test? We can filter them to determine if they are fatal
+  or not.
 
   Is fatal. Right now, every exception is fatal. Non-fatal
   can be added here as they are found.
@@ -360,29 +395,38 @@ def didAFatalExceptionOccur():
 
   """
 
-  errTxt = getErrorText()
-  partExc = getExceptionText()
-  # Theres probably a better way to do this None checking
-  if errTxt is None and partExc is None:
-    return False
-  elif errTxt is None and partExc is not None:
-    excTxt = partExc
-  elif errTxt is not None and partExc is None:
-    excTxt = errTxt
-  else:
-    excTxt = partExc + errTxt
-
-  if excTxt is None:    # Should never happen
+  excText = getBothErrorTexts()
+  if excText is None:
     return False
 
-  if "gov.nasa.jpf." in excTxt and "Exception" in excTxt:
+  if excText.find("gov.nasa.jpf.") > 0 and excText.find("Exception") > 0:
     return True
 
-  if "java." in excTxt and "Exception" in excTxt:
+  if excText.find("java.") > 0 and excText.find("Exception") > 0:
     return True
 
   return False
 
+
+# Utility fns
+
+def getBothErrorTexts():
+
+  errText = getErrorText()
+  excPart = getExceptionText()
+
+  # Theres probably a better way to do this None checking
+  excText = None
+  if errText is None and excPart is None:
+    return None
+  elif errText is None and excPart is not None:
+    excText = excPart
+  elif errText is not None and excPart is None:
+    excText = errText
+  else:
+    excText = excPart + errText
+
+  return excText
 
 # Passthrough fns - who call their Java counterparts
 
@@ -423,11 +467,11 @@ def outOfMemory():
   global _jpfLauncher
 
   errStr = getErrorText()
-  if errStr is not None and "gov.nasa.jpf.vm.NoOutOfMemoryErrorProperty" in errStr:
+  if errStr is not None and errStr.find("gov.nasa.jpf.vm.NoOutOfMemoryErrorProperty") > 0:
     return True
 
   excStr = getExceptionText()
-  if excStr is not None and "out-of-memory termination" in excStr:
+  if excStr is not None and excStr.find("out-of-memory termination") > 0:
     return True
 
 

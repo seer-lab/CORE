@@ -767,9 +767,9 @@ def evaluate_modelcheck(individual, generation):
 
   try:
     logger.debug("Creating gateway.")
-    run_jpf.createGateway()
+    run_jpf.createGateway(individual.id, generation)
 
-    run_jpf.runJPF(individual.id, generation)
+    run_jpf.runJPF()
 
     # After running JPF, display any errors detected right away
     errStr = run_jpf.getErrorText()
@@ -788,7 +788,6 @@ def evaluate_modelcheck(individual, generation):
       #_useJPF = False
       return True
 
-    # Deal with specific problems
     if run_jpf.timeExceeded():
       logger.error("JPF ran out of time. This mutant will be evaluated by ConTest.")
       #_useJPF = False
@@ -802,10 +801,27 @@ def evaluate_modelcheck(individual, generation):
 
     stats = run_jpf.getStatistics()
     if stats is None:
-      logger.error("Something has gone wrong with JPF. No statistics were collected.")
-      logger.error("This mutant will be evaluated by ConTest.")
+      logger.error("Something has gone wrong with JPF. No statistics were")
+      logger.error("collected. This mutant will be evaluated by ConTest.")
       #_useJPF = False
       return True
+
+    issueTxt = run_jpf.checkForKnownIssues()
+    if issueTxt is not None and issueTxt is "attemptNullObjectLock":
+      logger.error("We've generated a mutant that locks on an object before it")
+      logger.error("is created. It compiles, but JPF will always report an")
+      logger.error("\'Attempt to acquire lock for null object\' exception.")
+      logger.error("Reseting this member so we can try again next generation.")
+      txl_operator.create_local_project(individual.generation, individual.id, False)
+      # Add scoring info for this generation (indexOutOfRange errors if you don't)
+      individual.score.append(0)
+      individual.evalMethod.append('None')
+      individual.successes.append(-1)
+      individual.timeouts.append(-1)
+      individual.dataraces.append(-1)
+      individual.deadlocks.append(-1)
+      individual.errors.append(-1)
+      return False # No ConTest evaluation
 
     if run_jpf.didAFatalExceptionOccur():
       logger.error("Either JPF or the program under test threw an exception.")
@@ -840,7 +856,8 @@ def evaluate_modelcheck(individual, generation):
     logger.debug("Deadlock data: {}".format(lockResult))
 
     depthLimitReached = stats[0] >= config._JPF_SEARCH_DEPTH
-    logger.debug("Depth limit ({}) reached: {}".format(config._JPF_SEARCH_DEPTH, depthLimitReached))
+    logger.debug("Depth limit ({}) reached: {}".format( \
+      config._JPF_SEARCH_DEPTH, depthLimitReached))
 
     maxFitness = config._CONTEST_RUNS * config._SUCCESS_WEIGHT
     logger.debug("Max fitness: {}".format(maxFitness))
@@ -848,15 +865,18 @@ def evaluate_modelcheck(individual, generation):
     # Deep breath. If we've made it this far, we can attempt to make sense of the results
 
     if depthLimitReached and (raceFound or lockFound):
-      logger.debug("We've reached the configured depth limit, {}.".format(config._JPF_SEARCH_DEPTH))
-      logger.debug("Unfortunately there are still bugs. It looks like JPF in its")
-      logger.debug("current configuration won't be able to help us any more.")
-      logger.debug("Turning it off. For the rest of this run, only ConTest will be used.")
+      logger.debug("We've reached the configured depth limit, {}." \
+        .format(config._JPF_SEARCH_DEPTH))
+      logger.debug("Unfortunately there are still bugs. It looks like JPF")
+      logger.debug("in its current configuration won't be able to help us")
+      logger.debug("any more. Turning it off. For the rest of this run,")
+      logger.debug("only ConTest will be used.")
       _useJPF = False
       return True
 
     if depthLimitReached and not raceFound and not lockFound:
-      logger.debug("We've reached the configured depth limit, {}.".format(config._JPF_SEARCH_DEPTH))
+      logger.debug("We've reached the configured depth limit, {}." \
+        .format(config._JPF_SEARCH_DEPTH))
       logger.debug("No deadlocks or data races were reported, so we may have")
       logger.debug("a correct program. (To this depth.) Invoking ConTest for")
       logger.debug("further testing.")
