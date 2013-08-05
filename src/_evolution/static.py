@@ -348,7 +348,7 @@ def find_static_in_db(projectName):
   logger.debug("Read classMeth: {}".format(classMeth))
   logger.debug("Read classMeVa: {}".format(classMethVar))
 
-  configDBIn.close()
+  #configDBIn.close()
   return True
 
 def write_static_to_db(projectName):

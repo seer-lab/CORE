@@ -155,7 +155,7 @@ def main():
 
   # We're keeping a database (config file) containing the results
   # of previous static analysis runs. Check it first.
-  if not static.find_static_in_db(config._PROJECT_PREFIX):
+  if not static.find_static_in_db(config._PROJECT_TESTSUITE):
     static.configure_chord()
     static.run_chord_datarace()
     static.get_chord_targets()

@@ -196,9 +196,9 @@ def start():
   finally:
     if len(static.classVar) > 0 or len(static.classMeth) > 0 \
       or len(static.classMethVar) > 0:
-      static.write_static_to_db(config._PROJECT_PREFIX)
+      static.write_static_to_db(config._PROJECT_TESTSUITE)
       logger.debug("Wrote static records to disk in section {}" \
-        .format(config._PROJECT_PREFIX))
+        .format(config._PROJECT_TESTSUITE))
 
 
 def evolve(generation=0, worstScore=0):

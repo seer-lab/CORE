@@ -1,4 +1,4 @@
-[Account,Main,ManageAccount]
+[AccountTest]
 classvar = [('ManageAccount', 'account'), ('Account', 'amount'), ('ManageAccount', 'accounts'), ('ManageAccount', 'i'), ('ManageAccount', 'num')]
 classmeth = [(u'Account', u'transfer'), (u'Account', u'depsite')]
 classmethvar = [(u'Account', u'transfer', 'amount'), (u'Account', u'depsite', 'amount')]
