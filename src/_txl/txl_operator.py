@@ -221,12 +221,12 @@ def generate_mutants(generation, memberNum, txlOperator, sourceFile, destDir):
 
   # ----- ASM -----
   if txlOperator is config._MUTATION_ASM:
-    if static.do_we_have_triples():
-      for lineCMV in static.finalCMV:
+    if static.do_we_have_CMV():
+      for lineCMV in static.classMethVar:
 
         # Only make mutants where the variable is within scope of the class
         # If ('SynchronizedCache', 'someMethod', '_memorySize') and
-        #    ('CacheObject', 'someOtherMethod', '_objSize') are in static.finalCMV,
+        #    ('CacheObject', 'someOtherMethod', '_objSize') are in static.classMethVar,
         # when line[-3] is CacheObject, only the second line is in scope
         if sourceNameOnly != lineCMV[-3]:
           continue
@@ -259,8 +259,8 @@ def generate_mutants(generation, memberNum, txlOperator, sourceFile, destDir):
 
 
     #  We have class, variable information
-    if static.do_we_have_merged_classVar():
-      for lineMCV in static.mergedClassVar:
+    if static.do_we_have_CV():
+      for lineMCV in static.classVar:
         # See comment above
         if sourceNameOnly != lineMCV[-2]:
           continue
@@ -309,8 +309,8 @@ def generate_mutants(generation, memberNum, txlOperator, sourceFile, destDir):
   # ----- ASAT ------
   elif txlOperator is config._MUTATION_ASAT:
     # Case 1: We have the (class, method, variable) triples
-    if static.do_we_have_triples():
-      for lineCMV in static.finalCMV:
+    if static.do_we_have_CMV():
+      for lineCMV in static.classMethVar:
         if sourceNameOnly != lineCMV[-3]:
           continue
 
@@ -318,7 +318,7 @@ def generate_mutants(generation, memberNum, txlOperator, sourceFile, destDir):
         methodName = lineCMV[-2]
         className = lineCMV[-3]
 
-        for lineCMV2 in static.finalCMV:
+        for lineCMV2 in static.classMethVar:
 
           syncVar = lineCMV2[-1]
 
@@ -340,15 +340,17 @@ def generate_mutants(generation, memberNum, txlOperator, sourceFile, destDir):
     # Two subcases to consider:
     # a. We have doubles, but not triples
     # b. We have triples, but no mutants were produced, so try doubles
-    if (static.do_we_have_merged_classVar() and not static.do_we_have_triples()) or (not os.listdir(txlDestDir) and static.do_we_have_triples() and static.do_we_have_merged_classVar()):
-      for lineMCV in static.mergedClassVar:
+    if (static.do_we_have_CV() and not static.do_we_have_CMV()) \
+      or (not os.listdir(txlDestDir) and static.do_we_have_CMV() \
+        and static.do_we_have_CV()):
+      for lineMCV in static.classVar:
         if sourceNameOnly != lineMCV[-2]:
           continue
 
         variableName = lineMCV[-1]
         className = lineMCV[-2]
 
-        for lineMCV2 in static.mergedClassVar:
+        for lineMCV2 in static.classVar:
           syncVar = lineMCV2[-1]
           mutantSource = sourceNameOnly + "_" + str(counter)
           outFile = tempfile.SpooledTemporaryFile()

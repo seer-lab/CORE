@@ -16,17 +16,16 @@ import fileinput
 # when CORE is run on different machines at the same time.
 coreDir = os.path.split(os.getcwd())[0] + os.sep
 srcConfig = os.path.join("..", "input", "config.py")
-configRoot = fileinput.FileInput(files=(srcConfig), inplace=1)
-for line in configRoot:
-  if line.find("_ROOT_DIR =") is 0:
-    line = "_ROOT_DIR = \"{}\" ".format(coreDir)
-  print(line[0:-1]) # Remove extra newlines (a trailing-space must exists in modified lines)
-configRoot.close()
+if os.path.exists(srcConfig):
+  configRoot = fileinput.FileInput(files=(srcConfig), inplace=1)
+  for line in configRoot:
+    if line.find("_ROOT_DIR =") is 0:
+      line = "_ROOT_DIR = \"{}\" ".format(coreDir)
+    print(line[0:-1]) # Remove extra newlines (a trailing-space must exists in modified lines)
+  configRoot.close()
 
 # Look for input/config.py and copy it to src so it doesn't
 # have to be done manually every time
-srcConfig = os.path.join("..", "input", "config.py")
-if os.path.exists(srcConfig):
   if os.path.exists("config.py"):
     os.remove("config.py")
   if os.path.exists("config.pyc"):
@@ -154,13 +153,14 @@ def main():
     send2trash(config._TMP_DIR)
     os.makedirs(config._TMP_DIR)
 
-  # Run the static analysis
-  static.configure_chord()
-  static.run_chord_datarace()
-  static.get_chord_targets()
-  static.load_contest_list()
-  static.create_merged_classVar_list()
-  static.create_final_triple()
+  # We're keeping a database (config file) containing the results
+  # of previous static analysis runs. Check it first.
+  if not static.find_static_in_db(config._PROJECT_PREFIX):
+    static.configure_chord()
+    static.run_chord_datarace()
+    static.get_chord_targets()
+    static.load_contest_list()
+    static.create_final_triple()
 
   # Start the main bug-fixing procedure
   evolution.start()
@@ -172,7 +172,7 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser(
     description="CORE: Concurrent Repair of Java Programs "\
                   "<https://github.com/sqrg-uoit/core>",
-    version="CORE 0.1.0",
+    version="CORE 0.9.0",
     usage="python core.py")
 
   # Parse the arguments passed from the shell

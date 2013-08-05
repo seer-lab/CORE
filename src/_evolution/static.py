@@ -22,6 +22,7 @@ import fileinput
 import sys
 import urllib2
 from bs4 import BeautifulSoup
+import ConfigParser
 import logging
 logger = logging.getLogger('core')
 
@@ -40,29 +41,14 @@ logger = logging.getLogger('core')
 # TODO: Record the results of the static analysis so it doesn't have to
 #       be run every time.
 
+_contestFoundVars = False
 
-# We get two kinds of output from Chord's static analysis:
-
-# 1. (class, variable) tuples from Chord
 classVar = []
 
-# 2. (class, method) tuples from Chord
 classMeth = []
 
-# In addition we have:
+classMethVar = []
 
-# 3. ConTest list of (class, variable) tuples
-conTestClassVar = []
-
-# Once we have classVar and conTestClassVar (#s 1 and 3) we can merge them in to one list
-
-# 4. Merged (class, variable) tuple list from static analysis and ConTest
-mergedClassVar = []
-
-# Then we combine #4 and #2 to get the class-method-variable list
-
-# 5. Final (class, method, variable) tuple list
-finalCMV = []
 
 def setup():
   """Check if the directories and tools are present for the testing process."""
@@ -79,6 +65,7 @@ def setup():
     print (message.args)
     sys.exit()
 
+# ------------------------ Chord ------------------------
 
 def configure_chord():
   logger.info("Configuring Chord's chord.properties file")
@@ -178,14 +165,16 @@ def get_chord_targets():
     if tdTxt.find("Dataraces on") > 0:
       # Look for class.variable
       stmtOne = re.search("(\S+)\.(\S+)", tdTxt)
-      if stmtOne is not None:
-        aClass = stmtOne.group(1)
-        aVar = stmtOne.group(2)
-        if aClass is not None and aVar is not None:
-          aTuple = (aClass, aVar)
-          if not find_tuple_in_list(aTuple, classVar):
-            logger.debug("(Case 1) Adding {} to classVar".format(aTuple))
-            classVar.append(aTuple)
+      if stmtOne is None:
+        continue
+      aClass = stmtOne.group(1)
+      aVar = stmtOne.group(2)
+      if aClass is None or aVar is None:
+        continue
+      aTuple = (aClass, aVar)
+      if aTuple not in classVar:
+        logger.debug("(Case 1) Adding {} to classVar".format(aTuple))
+        classVar.append(aTuple)
 
     # 2. Look for class.method(args), except for .main(java.lang.String[])
     # eg: <tr>
@@ -197,20 +186,24 @@ def get_chord_targets():
     #        <td><a href="null.html#-1">Bank.main(java.lang.String[])</a> (Rd)
     #        </td>
     #     </tr>
-    elif tdTxt.find("race_TE"):
+    elif tdTxt.find("race_TE") > 0:
 
       for j in range(1, 4):  # Always 4 tds
         tdStr = ''.join(tds[j].find(text=True))
-        if tdStr.find(".main(java.lang.String[])") < 0: # if not found
-          stmtTwo = re.search("(\S*)\.(\S*)\(\S*\)", tdStr)
-          if stmtTwo is not None:
-            aClass = stmtTwo.group(1)
-            aMeth = stmtTwo.group(2)
-            if aClass is not None and aMeth is not None:
-              aTuple = (aClass, aMeth)
-              if not find_tuple_in_list(aTuple, classMeth):
-                logger.debug("(Case 2) Adding {} to classMeth".format(aTuple))
-                classMeth.append(aTuple)
+        # Ignore anything containing ".main(java.lang.String[])"
+        if tdStr.find(".main(java.lang.String[])") > 0:
+          continue
+        stmtTwo = re.search("(\S*)\.(\S*)\(\S*\)", tdStr)
+        if stmtTwo is None:
+          continue
+        aClass = stmtTwo.group(1)
+        aMeth = stmtTwo.group(2)
+        if aClass is None or aMeth is None:
+          continue
+        aTuple = (aClass, aMeth)
+        if aTuple not in classMeth:
+          logger.debug("(Case 2) Adding {} to classMeth".format(aTuple))
+          classMeth.append(aTuple)
 
   if len(classVar) > 0:
     logger.debug("Populated class.variable list with Chord data")
@@ -218,45 +211,10 @@ def get_chord_targets():
     logger.debug("Populated class.method list with Chord data")
 
 
-def find_tuple_in_list(inTuple, inList):
-
-  for aTuple in inList:
-    #logger.debug("Comparing {} to {}".format(inTuple, aTuple))
-    if aTuple == inTuple:
-      return True
-  return False
-
-
-def create_merged_classVar_list():
-  # Merge class-variable from Chord and ConTest
-
-  if not do_we_have_contest_vars() and len(classVar) is 0:
-    logger.info("Neither ConTest nor Chord found any classes or variables used concurrently")
-
-  # New: Build the merged class-variable list from whatever is available
-  logger.info("Created merged (class, variable) list from:")
-
-  if do_we_have_contest_vars():
-    logger.info("    - ConTest variables (class, variable)")
-    for aTuple in conTestClassVar:
-      if not find_tuple_in_list(aTuple, mergedClassVar):
-        #logger.debug("Adding ConTest tuple {} to mergedClassVar".format(aTuple))
-        mergedClassVar.append(aTuple)
-
-  if len(classVar) > 0:
-    logger.info("    - Chord variables (class, method, variable)")
-    for aTuple in classVar:
-      if not find_tuple_in_list(aTuple, mergedClassVar):
-        #logger.debug("Adding Chord tuple {} to mergedClassVar".format(aTuple))
-        mergedClassVar.append(aTuple)
-
-
-def do_we_have_merged_classVar():
-  return len(mergedClassVar) > 0
-
+# ----------------------- Utility -----------------------
 
 def create_final_triple():
-  if len(classMeth) == 0 or not do_we_have_merged_classVar():
+  if len(classMeth) == 0 or len(classVar) == 0:
     #logger.debug("Couldn't create the list of (class, method, variable) triples")
     #logger.debug("One or both of the static analysis and ConTest shared variable detection didn't")
     #logger.debug("find anything, or failed. As we are missing one (or both) of class.method and")
@@ -265,20 +223,28 @@ def create_final_triple():
     return False
 
   for cmTuple in classMeth:
-    for cvTuple in mergedClassVar:
-      if cmTuple[-2] == cvTuple[-2]:  # Must be the same class
-        aTriple = (cmTuple[-2], cmTuple[-1], cvTuple[-1]) # Class, method, variable
-        if not find_tuple_in_list(aTriple, finalCMV):
-          #logger.debug("Adding triple {} to finalCMV".format(aTriple))
-          finalCMV.append(aTriple)
+    for cvTuple in classVar:
+      if not cmTuple[-2] == cvTuple[-2]:  # Must be the same class
+        continue
+      aTriple = (cmTuple[-2], cmTuple[-1], cvTuple[-1]) # Class, method, variable
+      if aTriple not in classMethVar:
+        #logger.debug("Adding triple {} to finalCMV".format(aTriple))
+        classMethVar.append(aTriple)
 
   #logger.info("Populated (class, method, variable) list with Chord and ConTest data")
   return True
 
 
-def do_we_have_triples():
+def do_we_have_CV():
+  return len(classVar) > 0
+
+
+def do_we_have_CM():
   return len(classMeth) > 0
 
+
+def do_we_have_CMV():
+  return len(classMethVar) > 0
 
 # -------------- ConTest Related Functions ---------------
 
@@ -298,11 +264,13 @@ def did_contest_find_shared_variables():
   return True
 
 
-def do_we_have_contest_vars():
-  return len(conTestClassVar) > 0
-
-
 def load_contest_list():
+
+  global _contestFoundVars
+
+  if _contestFoundVars:
+    return True
+
   if not did_contest_find_shared_variables():
     return False
 
@@ -310,11 +278,13 @@ def load_contest_list():
     variableName = line.split('.')[-1].strip(' \t\n\r')
     className = line.split('.')[-2].strip(' \t\n\r')
     aTuple = (className, variableName)
-    if not find_tuple_in_list(aTuple, conTestClassVar):
-      logger.debug("Adding {} to conTestClassVar".format(aTuple))
-      conTestClassVar.append(aTuple)
+    if aTuple not in classVar:
+      logger.debug("Adding {} to classVar".format(aTuple))
+      classVar.append(aTuple)
 
   logger.info("Populated class.variable list with ConTest data")
+  _contestFoundVars = True
+  create_final_triple()
   return True
 
 # ---------------- JPF Related Functions -----------------
@@ -330,10 +300,11 @@ def add_JPF_race_list(JPFlist):
   """
 
   for aTuple in JPFlist:
-    if not aTuple in classMeth:
+    if aTuple not in classMeth:
       classMeth.append(aTuple)
 
   create_final_triple()
+
 
 def add_JPF_lock_list(JPFList):
   """Combine the list of classes involved with the deadlocks
@@ -347,7 +318,58 @@ def add_JPF_lock_list(JPFList):
   for aItem in JPFList:
     for aTuple in classMeth:
       newTuple = (aItem, aTuple[1])
-      if not newTuple in classMeth:
+      if newTuple not in classMeth:
         classMeth.append(newTuple)
 
   create_final_triple()
+
+# ------------- Database of Static Analysis -----------------
+
+def find_static_in_db(projectName):
+  """
+
+  """
+
+  dbFileIn = os.path.join(config._ROOT_DIR , "src", "staticDB.txt")
+  if not os.path.exists(dbFileIn):
+    open(dbFileIn, 'a').close()
+    return False
+
+  configDBIn = ConfigParser.ConfigParser()
+  configDBIn.readfp(open(dbFileIn))
+
+  if not configDBIn.has_section(projectName):
+    return False
+
+  classVar = configDBIn.get(projectName, "classVar")
+  classMeth = configDBIn.get(projectName, "classMeth")
+  classMethVar = configDBIn.get(projectName, "classMethVar")
+  logger.debug("Read classVar : {}".format(classVar))
+  logger.debug("Read classMeth: {}".format(methVar))
+  logger.debug("Read classMeVa: {}".format(classMethVar))
+
+  configDBIn.close()
+  return True
+
+def write_static_to_db(projectName):
+  """
+
+  """
+
+  dbFileOut = os.path.join(config._ROOT_DIR , "src", "staticDB.txt")
+  if not os.path.exists(dbFileOut):
+    open(dbFileOut, 'a').close()
+
+  inData = open(dbFileOut, 'r')
+  configDBOut = ConfigParser.ConfigParser()
+  configDBOut.read(inData)
+
+  if not configDBOut.has_section(projectName):
+    configDBOut.add_section(projectName)
+
+  configDBOut.set(projectName, "classVar", classVar)
+  configDBOut.set(projectName, "classMeth", classMeth)
+  configDBOut.set(projectName, "classMethVar", classMethVar)
+
+  outData = open(dbFileOut, 'w')
+  configDBOut.write(outData)

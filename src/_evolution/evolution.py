@@ -71,9 +71,6 @@ def initialize(bestIndividual=None):
       mutationOperators += 1
 
   # Create and initialize the population of individuals
-  # Note: Indexed from 1, not 0
-
-  # TODO: Do we need the + 1 in config._EVOLUTION_POPULATION + 1
   for i in xrange(1, config._EVOLUTION_POPULATION + 1):
 
     if bestIndividual is None:  # Functional phase
@@ -195,8 +192,13 @@ def start():
     # logger.info("(Scroll up)")
 
   except:
-    logger.error("Unexpected error:\n", traceback.print_exc(file=sys.stdout))
-  #finally:
+    logger.error("evolution.start: Unexpected error:\n", traceback.print_exc(file=sys.stdout))
+  finally:
+    if len(static.classVar) > 0 or len(static.classMeth) > 0 \
+      or len(static.classMethVar) > 0:
+      static.write_static_to_db(config._PROJECT_PREFIX)
+      logger.debug("Wrote static records to disk in section {}" \
+        .format(config._PROJECT_PREFIX))
 
 
 def evolve(generation=0, worstScore=0):
@@ -794,8 +796,8 @@ def evaluate_modelcheck(individual, generation):
       return True
 
     if not run_jpf.hasJPFRun():
-      logger.error("Something has gone wrong. JPF hasn't run or hasn't completed running.")
-      logger.error("This mutant will be evaluated by ConTest.")
+      logger.error("Something has gone wrong. JPF hasn't run or hasn't completed")
+      logger.error("running. This mutant will be evaluated by ConTest.")
       #_useJPF = False
       return True
 
@@ -820,15 +822,8 @@ def evaluate_modelcheck(individual, generation):
       individual.timeouts.append(-1)
       individual.dataraces.append(-1)
       individual.deadlocks.append(-1)
-      individual.errors.append(-1)
+      individual.errors.append(1)
       return False # No ConTest evaluation
-
-    if run_jpf.didAFatalExceptionOccur():
-      logger.error("Either JPF or the program under test threw an exception.")
-      logger.error("We're assuming it was fatal.")
-      logger.error("This mutant will be evaluated by ConTest.")
-      #_useJPF = False
-      return True
 
     # Phew. We're past the error checking. Lets start the analysis.
     logger.debug("Statistics:")
@@ -843,7 +838,6 @@ def evaluate_modelcheck(individual, generation):
     raceResult = run_jpf.getInfoInDatarace()
     if raceResult is not None:
       static.add_JPF_race_list(raceResult)
-      #logger.debug("Adding JPF race list to search targets: {}".format(raceResult))
     logger.debug("Datarace found: {}".format(raceFound))
     logger.debug("Datarace data: {}".format(raceResult))
 
@@ -851,7 +845,6 @@ def evaluate_modelcheck(individual, generation):
     lockResult = run_jpf.getClassesInDeadlock()
     if lockResult is not None:
       static.add_JPF_lock_list(lockResult)
-      #logger.debug("Adding JPF lock list to search targets: {}".format(lockResult))
     logger.debug("Deadlock found: {}".format(lockFound))
     logger.debug("Deadlock data: {}".format(lockResult))
 
@@ -882,8 +875,8 @@ def evaluate_modelcheck(individual, generation):
       logger.debug("further testing.")
       return True
 
-    if (raceFound or lockFound):
-      logger.debug("Deadlock and/or data race found at depth {} (out of {})."
+    if raceFound or lockFound:
+      logger.debug("Deadlock and/or data race found at depth {} (out of {})." \
         .format(SearchDepth, config._JPF_SEARCH_DEPTH))
       depthFit = (SearchDepth / config._JPF_SEARCH_DEPTH) * maxFitness
       logger.debug("Assign fitness {} (out of {}) and move on.".format(depthFit, maxFitness))
@@ -894,12 +887,35 @@ def evaluate_modelcheck(individual, generation):
       individual.evalMethod.append('JPF')
       individual.successes.append(-1)
       individual.timeouts.append(-1)
-      individual.dataraces.append(-1)
-      individual.deadlocks.append(-1)
+      if raceFound:
+        individual.dataraces.append(1)
+      else:
+        individual.dataraces.append(-1)
+      if lockFound:
+        individual.deadlocks.append(1)
+      else:
+        individual.deadlocks.append(-1)
       individual.errors.append(-1)
       return False
 
-    elif not raceFound and not lockFound:
+    if run_jpf.didAnExceptionOccur():
+      logger.debug("There was no datarace or deadlock detected. An exception")
+      logger.debug("of a more general type was thrown though. We're scoring")
+      logger.debug("this mutant on the depth reached {} (out of {})." \
+        .format(SearchDepth, config._JPF_SEARCH_DEPTH))
+      depthFit = (SearchDepth / config._JPF_SEARCH_DEPTH) * maxFitness
+      logger.debug("Assign fitness {} (out of {}) and move on.".format(depthFit, maxFitness))
+      individual.score.append(depthFit)
+      individual.evalMethod.append('JPF')
+      individual.successes.append(-1)
+      individual.timeouts.append(-1)
+      individual.dataraces.append(-1)
+      individual.deadlocks.append(-1)
+      individual.errors.append(1)
+      return False
+
+    # Between this and "if raceFound or lockFound", all cases should be caught
+    if not raceFound and not lockFound:
       logger.debug("No data races or deadlocks found at depth {} (out of {})"
         .format(SearchDepth, config._JPF_SEARCH_DEPTH))
       logger.debug("This program might be correct (?)")
