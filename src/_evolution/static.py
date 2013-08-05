@@ -345,7 +345,7 @@ def find_static_in_db(projectName):
   classMeth = configDBIn.get(projectName, "classMeth")
   classMethVar = configDBIn.get(projectName, "classMethVar")
   logger.debug("Read classVar : {}".format(classVar))
-  logger.debug("Read classMeth: {}".format(methVar))
+  logger.debug("Read classMeth: {}".format(classMeth))
   logger.debug("Read classMeVa: {}".format(classMethVar))
 
   configDBIn.close()
