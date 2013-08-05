@@ -1,5 +1,30 @@
+[Bubblesort2Test]
+classvar = [('NewThread', 'fin'), ('NewThread', 'array'), ('NewThread', 'priority'), ('NewThread', 'endd')]
+classmeth = []
+classmethvar = []
+
 [AccountTest]
 classvar = [('ManageAccount', 'account'), ('Account', 'amount'), ('ManageAccount', 'accounts'), ('ManageAccount', 'i'), ('ManageAccount', 'num')]
 classmeth = [(u'Account', u'transfer'), (u'Account', u'depsite')]
 classmethvar = [(u'Account', u'transfer', 'amount'), (u'Account', u'depsite', 'amount')]
+
+[AccountsTest]
+classvar = [('Account', 'random'), ('Account', 'MAX_SUM'), ('Account', 'Account_Id'), ('Bank', 'accounts'), ('Account', 'Balance'), ('Bank', 'Bank_Total')]
+classmeth = [(u'Bank', u'Service')]
+classmethvar = [(u'Bank', u'Service', 'accounts'), (u'Bank', u'Service', 'Bank_Total')]
+
+[DeadlockTest]
+classvar = [('deadLock', 'a'), ('deadLock', 'b'), ('deadLock', 'hash'), ('deadLock', 'output')]
+classmeth = []
+classmethvar = []
+
+[LotteryTest]
+classvar = [('BuggyProgram', 'numOfUsers'), ('BuggyProgram', 'generated'), ('BuggyProgram$User', 'userNumber'), ('BuggyProgram', 'randomNumber'), ('BuggyProgram', 'history'), ('BuggyProgram', 'presented')]
+classmeth = [(u'User', u'generate'), (u'User', u'run')]
+classmethvar = []
+
+[PingPongTest]
+classvar = [('BugThread', 'bg'), ('BuggedProgram', 'pingPongPlayer'), ('PingPong', 'i'), ('BuggedProgram', 'bugAppearanceNumber')]
+classmeth = [(u'BuggedProgram', u'pingPong')]
+classmethvar = [(u'BuggedProgram', u'pingPong', 'pingPongPlayer'), (u'BuggedProgram', u'pingPong', 'bugAppearanceNumber')]
 

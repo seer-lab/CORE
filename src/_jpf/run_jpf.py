@@ -194,14 +194,7 @@ def wasADataraceFound():
 
   if excText is not None and excText.find("gov.nasa.jpf.listener.PreciseRaceDetector") > 0 \
     and re.search("(\S+)\.(\S+)\((\S+)", excText) is not None:
-    # Loader.main and NewThread.<init> are not classes and methods in the user
-    # code of the Java program under test. As far as CORE is concerned, these
-    # entries are false reports that are not considered. Unless there is some
-    # other problem, ConTest will (hopefully) perform the evaluation.
-    if excText.find("Loader.main") > 0 and excText.find("NewThread.<init>") > 0:
-      return False
-    else:
-      return True
+    return True
 
   return False
 
@@ -239,7 +232,7 @@ def getInfoInDatarace():
       continue
 
     # Loader.main and NewThread.<init> are not classes or methods
-    # from the code under test. See wasADataRaceFound() for details
+    # from the code under test. They are dataraces though.
     if aClass.find("Loader") > 0 and aMeth.find("main") > 0:
       continue
     if aClass.find("NewThread") > 0 and aMeth.find("<init>") > 0:

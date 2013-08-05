@@ -360,9 +360,9 @@ def write_static_to_db(projectName):
   if not os.path.exists(dbFileOut):
     open(dbFileOut, 'a').close()
 
-  inData = open(dbFileOut, 'r')
+  #inData = open(dbFileOut, 'r')
   configDBOut = ConfigParser.ConfigParser()
-  configDBOut.read(inData)
+  configDBOut.readfp(open(dbFileOut))
 
   if not configDBOut.has_section(projectName):
     configDBOut.add_section(projectName)
