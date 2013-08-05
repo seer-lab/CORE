@@ -222,11 +222,11 @@ def generate_mutants(generation, memberNum, txlOperator, sourceFile, destDir):
   # ----- ASM -----
   if txlOperator is config._MUTATION_ASM:
     if static.do_we_have_CMV():
-      for lineCMV in static.classMethVar:
+      for lineCMV in static._classMethVar:
 
         # Only make mutants where the variable is within scope of the class
         # If ('SynchronizedCache', 'someMethod', '_memorySize') and
-        #    ('CacheObject', 'someOtherMethod', '_objSize') are in static.classMethVar,
+        #    ('CacheObject', 'someOtherMethod', '_objSize') are in static._classMethVar,
         # when line[-3] is CacheObject, only the second line is in scope
         if sourceNameOnly != lineCMV[-3]:
           continue
@@ -260,7 +260,7 @@ def generate_mutants(generation, memberNum, txlOperator, sourceFile, destDir):
 
     #  We have class, variable information
     if static.do_we_have_CV():
-      for lineMCV in static.classVar:
+      for lineMCV in static._classVar:
         # See comment above
         if sourceNameOnly != lineMCV[-2]:
           continue
@@ -310,7 +310,7 @@ def generate_mutants(generation, memberNum, txlOperator, sourceFile, destDir):
   elif txlOperator is config._MUTATION_ASAT:
     # Case 1: We have the (class, method, variable) triples
     if static.do_we_have_CMV():
-      for lineCMV in static.classMethVar:
+      for lineCMV in static._classMethVar:
         if sourceNameOnly != lineCMV[-3]:
           continue
 
@@ -318,7 +318,7 @@ def generate_mutants(generation, memberNum, txlOperator, sourceFile, destDir):
         methodName = lineCMV[-2]
         className = lineCMV[-3]
 
-        for lineCMV2 in static.classMethVar:
+        for lineCMV2 in static._classMethVar:
 
           syncVar = lineCMV2[-1]
 
@@ -343,14 +343,19 @@ def generate_mutants(generation, memberNum, txlOperator, sourceFile, destDir):
     if (static.do_we_have_CV() and not static.do_we_have_CMV()) \
       or (not os.listdir(txlDestDir) and static.do_we_have_CMV() \
         and static.do_we_have_CV()):
-      for lineMCV in static.classVar:
+
+      # We can't use primitives in synchronize: synchronize(int){...}, but we
+      # can synchronize int statements: synchronize(...){...int...}
+      synchOn = static._classVar + static._primitiveVars
+      for lineMCV in synchOn:
         if sourceNameOnly != lineMCV[-2]:
           continue
 
         variableName = lineMCV[-1]
         className = lineMCV[-2]
 
-        for lineMCV2 in static.classVar:
+
+        for lineMCV2 in static._classVar:
           syncVar = lineMCV2[-1]
           mutantSource = sourceNameOnly + "_" + str(counter)
           outFile = tempfile.SpooledTemporaryFile()

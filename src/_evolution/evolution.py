@@ -74,7 +74,7 @@ def initialize(bestIndividual=None):
   for i in xrange(1, config._EVOLUTION_POPULATION + 1):
 
     if bestIndividual is None:  # Functional phase
-      logger.debug("Creating individual {}".format(i))
+      #logger.debug("Creating individual {}".format(i))
       individual = Individual(mutationOperators, i)
     else:  # Non-functional phase
       logger.debug("Cloning best functional individual {} into individual {}".format(
@@ -194,8 +194,8 @@ def start():
   except:
     logger.error("evolution.start: Unexpected error:\n", traceback.print_exc(file=sys.stdout))
   finally:
-    if len(static.classVar) > 0 or len(static.classMeth) > 0 \
-      or len(static.classMethVar) > 0:
+    if len(static._classVar) > 0 or len(static._classMeth) > 0 \
+      or len(static._classMethVar) > 0:
       static.write_static_to_db(config._PROJECT_TESTSUITE)
       logger.debug("Wrote static records to disk in section {}" \
         .format(config._PROJECT_TESTSUITE))

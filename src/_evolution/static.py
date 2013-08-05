@@ -43,12 +43,18 @@ logger = logging.getLogger('core')
 
 _contestFoundVars = False
 
-classVar = []
+_classVar = []
 
-classMeth = []
+_classMeth = []
 
-classMethVar = []
+_classMethVar = []
 
+# Locking on primitive types (int, float, bool, ...) isn't allowed in
+# Java. The analysis in this unit return all shared variables, including
+# primitives. Removing them from the lists has multiple benefits: Less
+# mutants generated (hard drive space, file IO is slow) and is
+# faster (mutant generation, compile time).
+_primitiveVars = []
 
 def setup():
   """Check if the directories and tools are present for the testing process."""
@@ -172,9 +178,12 @@ def get_chord_targets():
       if aClass is None or aVar is None:
         continue
       aTuple = (aClass, aVar)
-      if aTuple not in classVar:
-        logger.debug("(Case 1) Adding {} to classVar".format(aTuple))
-        classVar.append(aTuple)
+      if aTuple not in _classVar and not is_variable_primitive(aTuple):
+        logger.debug("(Case 1) Adding {} to _classVar".format(aTuple))
+        _classVar.append(aTuple)
+      else:
+        logger.debug("{} was rejected because it is either in the list".format(aTuple))
+        logger.debug("already, or a primitive type.")
 
     # 2. Look for class.method(args), except for .main(java.lang.String[])
     # eg: <tr>
@@ -201,20 +210,23 @@ def get_chord_targets():
         if aClass is None or aMeth is None:
           continue
         aTuple = (aClass, aMeth)
-        if aTuple not in classMeth:
-          logger.debug("(Case 2) Adding {} to classMeth".format(aTuple))
-          classMeth.append(aTuple)
+        if aTuple not in _classMeth and not is_variable_primitive(aTuple):
+          logger.debug("(Case 2) Adding {} to _classMeth".format(aTuple))
+          _classMeth.append(aTuple)
+        else:
+          logger.debug("{} was rejected because it is either in the list".format(aTuple))
+          logger.debug("already, or a primitive type.")
 
-  if len(classVar) > 0:
+  if len(_classVar) > 0:
     logger.debug("Populated class.variable list with Chord data")
-  if len(classMeth) > 0:
+  if len(_classMeth) > 0:
     logger.debug("Populated class.method list with Chord data")
 
 
 # ----------------------- Utility -----------------------
 
 def create_final_triple():
-  if len(classMeth) == 0 or len(classVar) == 0:
+  if len(_classMeth) == 0 or len(_classVar) == 0:
     #logger.debug("Couldn't create the list of (class, method, variable) triples")
     #logger.debug("One or both of the static analysis and ConTest shared variable detection didn't")
     #logger.debug("find anything, or failed. As we are missing one (or both) of class.method and")
@@ -222,43 +234,43 @@ def create_final_triple():
     #logger.debug("will be empty.")
     return False
 
-  for cmTuple in classMeth:
-    for cvTuple in classVar:
+  for cmTuple in _classMeth:
+    for cvTuple in _classVar:
       if not cmTuple[-2] == cvTuple[-2]:  # Must be the same class
         continue
       aTriple = (cmTuple[-2], cmTuple[-1], cvTuple[-1]) # Class, method, variable
-      if aTriple not in classMethVar:
+      if aTriple not in _classMethVar and not is_variable_primitive(aTriple):
         #logger.debug("Adding triple {} to finalCMV".format(aTriple))
-        classMethVar.append(aTriple)
+        _classMethVar.append(aTriple)
+      else:
+        logger.debug("{} was rejected because it is either in the list".format(aTriple))
+        logger.debug("already, or a primitive type.")
 
   #logger.info("Populated (class, method, variable) list with Chord and ConTest data")
   return True
 
 
 def do_we_have_CV():
-  return len(classVar) > 0
+  return len(_classVar) > 0
 
 
 def do_we_have_CM():
-  return len(classMeth) > 0
+  return len(_classMeth) > 0
 
 
 def do_we_have_CMV():
-  return len(classMethVar) > 0
+  return len(_classMethVar) > 0
 
 # -------------- ConTest Related Functions ---------------
 
 def did_contest_find_shared_variables():
   # Ensure that there is a shared variable file (From ConTest)
   if not os.path.exists(config._SHARED_VARS_FILE):
-    logger.error("ConTest's config._SHARED_VARS_FILE doesn't exist")
+    #logger.debug("ConTest's config._SHARED_VARS_FILE doesn't exist")
     return False
 
-  # If you are concerned ConTest didn't run correctly, uncomment the
-  # "logger.debug("==== Tester, Output text:\n")" section of lines in
-  # tester.py
   if os.path.getsize(config._SHARED_VARS_FILE) == 0:
-    logger.info("ConTest didn't detect any shared variables (Or didn't run correctly.)")
+    #logger.debug("ConTest didn't detect any shared variables (Or didn't run correctly.)")
     return False
 
   return True
@@ -278,9 +290,12 @@ def load_contest_list():
     variableName = line.split('.')[-1].strip(' \t\n\r')
     className = line.split('.')[-2].strip(' \t\n\r')
     aTuple = (className, variableName)
-    if aTuple not in classVar:
-      logger.debug("Adding {} to classVar".format(aTuple))
-      classVar.append(aTuple)
+    if aTuple not in _classVar and not is_variable_primitive(aTuple):
+      logger.debug("Added {} to _classVar".format(aTuple))
+      _classVar.append(aTuple)
+    else:
+        logger.debug("{} was rejected because it is either in the list".format(aTuple))
+        logger.debug("already, or a primitive type.")
 
   logger.info("Populated class.variable list with ConTest data")
   _contestFoundVars = True
@@ -300,8 +315,11 @@ def add_JPF_race_list(JPFlist):
   """
 
   for aTuple in JPFlist:
-    if aTuple not in classMeth:
-      classMeth.append(aTuple)
+    if aTuple not in _classMeth and not is_variable_primitive(aTuple):
+      _classMeth.append(aTuple)
+    else:
+      logger.debug("{} was rejected because it is either in the list".format(aTuple))
+      logger.debug("already, or a primitive type.")
 
   create_final_triple()
 
@@ -309,21 +327,24 @@ def add_JPF_race_list(JPFlist):
 def add_JPF_lock_list(JPFList):
   """Combine the list of classes involved with the deadlocks
   discovered by JPF with the methods already found in the
-  classMeth tuples and adds them to classMeth.
+  _classMeth tuples and adds them to _classMeth.
 
   Arguments
     JPFList (List string): List of classes involved in deadlocks
   """
 
   for aItem in JPFList:
-    for aTuple in classMeth:
+    for aTuple in _classMeth:
       newTuple = (aItem, aTuple[1])
-      if newTuple not in classMeth:
-        classMeth.append(newTuple)
+      if newTuple not in _classMeth and not is_variable_primitive(aTuple):
+        _classMeth.append(newTuple)
+      else:
+        logger.debug("{} was rejected because it is either in the list".format(aTuple))
+        logger.debug("already, or a primitive type.")
 
   create_final_triple()
 
-# ------------- Database of Static Analysis -----------------
+# ------------ Database of Static Analysis ---------------
 
 def find_static_in_db(projectName):
   """
@@ -341,15 +362,16 @@ def find_static_in_db(projectName):
   if not configDBIn.has_section(projectName):
     return False
 
-  classVar = configDBIn.get(projectName, "classVar")
-  classMeth = configDBIn.get(projectName, "classMeth")
-  classMethVar = configDBIn.get(projectName, "classMethVar")
-  logger.debug("Read classVar : {}".format(classVar))
-  logger.debug("Read classMeth: {}".format(classMeth))
-  logger.debug("Read classMeVa: {}".format(classMethVar))
-
-  #configDBIn.close()
+  _classVar      = configDBIn.get(projectName, "_classVar")
+  _classMeth     = configDBIn.get(projectName, "_classMeth")
+  _classMethVar  = configDBIn.get(projectName, "_classMethVar")
+  _primitiveVars = configDBIn.get(projectName, "_primitiveVars")
+  logger.debug("Read _classVar : {}".format(_classVar))
+  logger.debug("Read _classMeth: {}".format(_classMeth))
+  logger.debug("Read _classMethVar: {}".format(_classMethVar))
+  logger.debug("Read _primitiveVars: {}".format(_primitiveVars))
   return True
+
 
 def write_static_to_db(projectName):
   """
@@ -367,9 +389,89 @@ def write_static_to_db(projectName):
   if not configDBOut.has_section(projectName):
     configDBOut.add_section(projectName)
 
-  configDBOut.set(projectName, "classVar", classVar)
-  configDBOut.set(projectName, "classMeth", classMeth)
-  configDBOut.set(projectName, "classMethVar", classMethVar)
+  configDBOut.set(projectName, "_classVar", _classVar)
+  configDBOut.set(projectName, "_classMeth", _classMeth)
+  configDBOut.set(projectName, "_classMethVar", _classMethVar)
+  configDBOut.set(projectName, "_primitiveVars", _primitiveVars)
 
   outData = open(dbFileOut, 'w')
   configDBOut.write(outData)
+
+
+# ------------- Primitive Type Elimination ---------------
+
+def eliminate_primitives():
+  # As we are removing this from the list, we must traverse it in reverse
+  # order to access all items.
+  for aTuple in reversed(_classVar):
+    logger.debug("Checking if {} from _classVar is primitive.".format(aTuple))
+    if search_files_for_primitives(aTuple):
+      logger.debug("Removing {} from _classVar".format(aTuple))
+      #logger.debug("_classVar before: {}".format(_classVar))
+      _classVar.remove(aTuple)
+      #logger.debug("_classVar after: {}".format(_classVar))
+
+  logger.debug("Before _classMethVar: {}".format(_classMethVar))
+  for aTuple in reversed(_classMethVar):
+    logger.debug("Checking if {} from _classMethVar is primitive.".format(aTuple))
+    if search_files_for_primitives(aTuple):
+      logger.debug("Removing {} from _classMethVar".format(aTuple))
+      #logger.debug("_classMethVar before: {}".format(_classMethVar))
+      _classMethVar.remove(aTuple)
+      #logger.debug("_classMethVar after: {}".format(_classMethVar))
+
+def search_files_for_primitives(primTuple):
+  """
+  """
+  logger.debug("The input variable is {}.".format(primTuple))
+
+  for root, dirs, files in os.walk(config._PROJECT_PRISTINE_SRC_DIR):
+
+    for aFile in files:
+      if ("." not in aFile and aFile.split(".")[1] != "java"):
+        continue
+      logger.debug("Looking in {}".format(aFile))
+      lines = None
+      with open(os.path.join(root, aFile)) as fileHnd:
+        lines = fileHnd.read().splitlines()
+
+      for line in lines:
+        aTuple = None
+        primVar = primTuple[-1]
+        # Someone with a better knowledge of regular expressions should rewrite
+        # this.
+        if re.search("int .* (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None \
+          or re.search("int (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None \
+          or re.search("short .* (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None \
+          or re.search("short (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None \
+          or re.search("long .* (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None \
+          or re.search("long (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None \
+          or re.search("float .* (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None \
+          or re.search("float (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None \
+          or re.search("double .* (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None \
+          or re.search("double (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None \
+          or re.search("boolean .* (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None \
+          or re.search("boolean (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None \
+          or re.search("char .* (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None \
+          or re.search("char (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None:
+          aTuple = primTuple
+
+        if aTuple is None:
+          continue
+        logger.debug("Found tuple, {}.".format(aTuple))
+        if aTuple in _primitiveVars:
+          continue
+
+        logger.debug("Adding tuple {} (from {}) to _primitiveVars.".format(aTuple, aFile))
+        _primitiveVars.append(aTuple)
+        return True
+
+  return False
+
+def is_variable_primitive(thisVar):
+  for aTuple in _primitiveVars:
+    logger.debug("Comparing primitive {} to {}".format(aTuple[-1], thisVar[-1]))
+    if aTuple[-1] is thisVar[-1]:
+      return True
+
+  return False

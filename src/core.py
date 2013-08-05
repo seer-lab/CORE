@@ -153,6 +153,7 @@ def main():
     send2trash(config._TMP_DIR)
     os.makedirs(config._TMP_DIR)
 
+
   # We're keeping a database (config file) containing the results
   # of previous static analysis runs. Check it first.
   if not static.find_static_in_db(config._PROJECT_TESTSUITE):
@@ -161,6 +162,9 @@ def main():
     static.get_chord_targets()
     static.load_contest_list()
     static.create_final_triple()
+
+  # Primitive types (int, float, ...) cannot be locked on
+  static.eliminate_primitives()
 
   # Start the main bug-fixing procedure
   evolution.start()
