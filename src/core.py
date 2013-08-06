@@ -165,6 +165,12 @@ def main():
 
   # Primitive types (int, float, ...) cannot be locked on
   static.eliminate_primitives()
+  # Write the discovered values to file right away. The
+  # final values are written in the finally block of
+  # evolution.start() at the end of the run.
+  if len(static._classVar) > 0 or len(static._classMeth) > 0 \
+    or len(static._classMethVar) > 0:
+    static.write_static_to_db(config._PROJECT_TESTSUITE)
 
   # Start the main bug-fixing procedure
   evolution.start()

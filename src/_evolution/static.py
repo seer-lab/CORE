@@ -407,18 +407,19 @@ def eliminate_primitives():
     logger.debug("Checking if {} from _classVar is primitive.".format(aTuple))
     if search_files_for_primitives(aTuple):
       logger.debug("Removing {} from _classVar".format(aTuple))
-      #logger.debug("_classVar before: {}".format(_classVar))
       _classVar.remove(aTuple)
-      #logger.debug("_classVar after: {}".format(_classVar))
 
   logger.debug("Before _classMethVar: {}".format(_classMethVar))
   for aTuple in reversed(_classMethVar):
     logger.debug("Checking if {} from _classMethVar is primitive.".format(aTuple))
     if search_files_for_primitives(aTuple):
       logger.debug("Removing {} from _classMethVar".format(aTuple))
-      #logger.debug("_classMethVar before: {}".format(_classMethVar))
       _classMethVar.remove(aTuple)
-      #logger.debug("_classMethVar after: {}".format(_classMethVar))
+
+
+# Important note: The src/_evolution/primitive_tester subdirectory contains
+#                 a test program for the regular expressions below. See
+#                 primitive-tester.py for details.
 
 def search_files_for_primitives(primTuple):
   """
@@ -436,24 +437,26 @@ def search_files_for_primitives(primTuple):
         lines = fileHnd.read().splitlines()
 
       for line in lines:
+        if line.find("//"):
+          line = line[:line.find("//")]
         aTuple = None
         primVar = primTuple[-1]
         # Someone with a better knowledge of regular expressions should rewrite
-        # this.
-        if re.search("int .* (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None \
-          or re.search("int (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None \
-          or re.search("short .* (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None \
-          or re.search("short (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None \
-          or re.search("long .* (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None \
-          or re.search("long (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None \
-          or re.search("float .* (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None \
-          or re.search("float (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None \
-          or re.search("double .* (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None \
-          or re.search("double (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None \
-          or re.search("boolean .* (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None \
-          or re.search("boolean (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None \
-          or re.search("char .* (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None \
-          or re.search("char (" + primVar + ")(?!\[)(?!\.)(?!\+\+)", line) is not None:
+        # this. See also primitive_tester/primitive-tester.py
+        if re.search("int .* (" + primVar + ")(?!\[)(?!\.)", line) is not None \
+          or re.search("int (" + primVar + ")(?!\[)(?!\.)", line) is not None \
+          or re.search("boolean .* (" + primVar + ")(?!\[)(?!\.)", line) is not None \
+          or re.search("boolean (" + primVar + ")(?!\[)(?!\.)", line) is not None \
+          or re.search("long .* (" + primVar + ")(?!\[)(?!\.)", line) is not None \
+          or re.search("long (" + primVar + ")(?!\[)(?!\.)", line) is not None \
+          or re.search("float .* (" + primVar + ")(?!\[)(?!\.)", line) is not None \
+          or re.search("float (" + primVar + ")(?!\[)(?!\.)", line) is not None \
+          or re.search("double .* (" + primVar + ")(?!\[)(?!\.)", line) is not None \
+          or re.search("double (" + primVar + ")(?!\[)(?!\.)", line) is not None \
+          or re.search("char .* (" + primVar + ")(?!\[)(?!\.)", line) is not None \
+          or re.search("char (" + primVar + ")(?!\[)(?!\.)", line) is not None \
+          or re.search("short .* (" + primVar + ")(?!\[)(?!\.)", line) is not None \
+          or re.search("short (" + primVar + ")(?!\[)(?!\.)", line) is not None:
           aTuple = primTuple
 
         if aTuple is None:
