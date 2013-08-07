@@ -181,9 +181,9 @@ def get_chord_targets():
       if aTuple not in _classVar and not is_variable_primitive(aTuple):
         logger.debug("(Case 1) Adding {} to _classVar".format(aTuple))
         _classVar.append(aTuple)
-      else:
-        logger.debug("{} was rejected because it is either in the list".format(aTuple))
-        logger.debug("already, or a primitive type.")
+      #else:
+      #  logger.debug("{} was rejected because it is either in _classVar".format(aTuple))
+      #  logger.debug("already, or the variable part is a primitive type.")
 
     # 2. Look for class.method(args), except for .main(java.lang.String[])
     # eg: <tr>
@@ -210,12 +210,11 @@ def get_chord_targets():
         if aClass is None or aMeth is None:
           continue
         aTuple = (aClass, aMeth)
-        if aTuple not in _classMeth and not is_variable_primitive(aTuple):
+        if aTuple not in _classMeth:
           logger.debug("(Case 2) Adding {} to _classMeth".format(aTuple))
           _classMeth.append(aTuple)
-        else:
-          logger.debug("{} was rejected because it is either in the list".format(aTuple))
-          logger.debug("already, or a primitive type.")
+        #else:
+        #  logger.debug("{} is already in _classMeth".format(aTuple))
 
   if len(_classVar) > 0:
     logger.debug("Populated class.variable list with Chord data")
@@ -240,11 +239,11 @@ def create_final_triple():
         continue
       aTriple = (cmTuple[-2], cmTuple[-1], cvTuple[-1]) # Class, method, variable
       if aTriple not in _classMethVar and not is_variable_primitive(aTriple):
-        #logger.debug("Adding triple {} to finalCMV".format(aTriple))
-        _classMethVar.append(aTriple)
-      else:
-        logger.debug("{} was rejected because it is either in the list".format(aTriple))
-        logger.debug("already, or a primitive type.")
+        logger.debug("Adding triple {} to _classMethVar".format(aTriple))
+      #  _classMethVar.append(aTriple)
+      #else:
+      #  logger.debug("{} was rejected because it is either in _classMethVar".format(aTriple))
+      #  logger.debug("already, or the variable part is a primitive type.")
 
   #logger.info("Populated (class, method, variable) list with Chord and ConTest data")
   return True
@@ -293,9 +292,9 @@ def load_contest_list():
     if aTuple not in _classVar and not is_variable_primitive(aTuple):
       logger.debug("Added {} to _classVar".format(aTuple))
       _classVar.append(aTuple)
-    else:
-        logger.debug("{} was rejected because it is either in the list".format(aTuple))
-        logger.debug("already, or a primitive type.")
+    #else:
+    #    logger.debug("{} was rejected because it is either in _classVar".format(aTuple))
+    #    logger.debug("already, or the variable part is a primitive type.")
 
   logger.info("Populated class.variable list with ConTest data")
   _contestFoundVars = True
@@ -315,11 +314,11 @@ def add_JPF_race_list(JPFlist):
   """
 
   for aTuple in JPFlist:
-    if aTuple not in _classMeth and not is_variable_primitive(aTuple):
+    if aTuple not in _classMeth:
       _classMeth.append(aTuple)
-    else:
-      logger.debug("{} was rejected because it is either in the list".format(aTuple))
-      logger.debug("already, or a primitive type.")
+      logger.debug("{} is new. Adding it to _classMeth.".format(aTuple))
+    #else:
+    #  logger.debug("{} is already in _classMeth".format(aTuple))
 
   create_final_triple()
 
@@ -336,11 +335,11 @@ def add_JPF_lock_list(JPFList):
   for aItem in JPFList:
     for aTuple in _classMeth:
       newTuple = (aItem, aTuple[1])
-      if newTuple not in _classMeth and not is_variable_primitive(aTuple):
+      if newTuple not in _classMeth:
         _classMeth.append(newTuple)
-      else:
-        logger.debug("{} was rejected because it is either in the list".format(aTuple))
-        logger.debug("already, or a primitive type.")
+        logger.debug("{} is new. Adding it to _classMeth.".format(aTuple))
+      #else:
+      #  logger.debug("{} is already in _classMeth".format(aTuple))
 
   create_final_triple()
 
@@ -409,7 +408,7 @@ def eliminate_primitives():
       logger.debug("Removing {} from _classVar".format(aTuple))
       _classVar.remove(aTuple)
 
-  logger.debug("Before _classMethVar: {}".format(_classMethVar))
+  #logger.debug("Before _classMethVar: {}".format(_classMethVar))
   for aTuple in reversed(_classMethVar):
     logger.debug("Checking if {} from _classMethVar is primitive.".format(aTuple))
     if search_files_for_primitives(aTuple):
@@ -431,7 +430,7 @@ def search_files_for_primitives(primTuple):
     for aFile in files:
       if ("." not in aFile and aFile.split(".")[1] != "java"):
         continue
-      logger.debug("Looking in {}".format(aFile))
+      #logger.debug("Looking in {}".format(aFile))
       lines = None
       with open(os.path.join(root, aFile)) as fileHnd:
         lines = fileHnd.read().splitlines()
@@ -473,7 +472,7 @@ def search_files_for_primitives(primTuple):
 
 def is_variable_primitive(thisVar):
   for aTuple in _primitiveVars:
-    logger.debug("Comparing primitive {} to {}".format(aTuple[-1], thisVar[-1]))
+    #logger.debug("Comparing primitive {} to {}".format(aTuple[-1], thisVar[-1]))
     if aTuple[-1] is thisVar[-1]:
       return True
 

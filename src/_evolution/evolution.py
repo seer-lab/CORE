@@ -787,25 +787,21 @@ def evaluate_modelcheck(individual, generation):
     # Deal with specific problems
     if run_jpf.outOfMemory():
       logger.error("JPF ran out of memory. This mutant will be evaluated by ConTest.")
-      #_useJPF = False
       return True
 
     if run_jpf.timeExceeded():
       logger.error("JPF ran out of time. This mutant will be evaluated by ConTest.")
-      #_useJPF = False
       return True
 
     if not run_jpf.hasJPFRun():
       logger.error("Something has gone wrong. JPF hasn't run or hasn't completed")
       logger.error("running. This mutant will be evaluated by ConTest.")
-      #_useJPF = False
       return True
 
     stats = run_jpf.getStatistics()
     if stats is None:
       logger.error("Something has gone wrong with JPF. No statistics were")
       logger.error("collected. This mutant will be evaluated by ConTest.")
-      #_useJPF = False
       return True
 
     issueTxt = run_jpf.checkForKnownIssues()

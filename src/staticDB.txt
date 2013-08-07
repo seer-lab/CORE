@@ -1,12 +1,12 @@
 [Bubblesort2Test]
-_classvar = [('NewThread', 'fin'), ('NewThread', 'array'), ('NewThread', 'priority'), ('NewThread', 'endd')]
+_classvar = [('NewThread', 'array')]
 _classmeth = []
 _classmethvar = []
-_primitivevars = []
+_primitivevars = [('NewThread', 'endd'), ('NewThread', 'priority'), ('NewThread', 'fin')]
 
 [AccountTest]
 _classvar = [('ManageAccount', 'account'), ('ManageAccount', 'accounts')]
-_classmeth = []
+_classmeth = [(u'Account', u'transfer'), (u'Account', u'depsite')]
 _classmethvar = []
 _primitivevars = [('ManageAccount', 'num'), ('ManageAccount', 'i'), ('Account', 'amount')]
 

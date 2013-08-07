@@ -187,6 +187,13 @@ def wasADataraceFound():
   if excText is None:
     return False
 
+  # The Loader.main and NewThread.<init> case (from comment) isn't a data
+  # race.  JPF will generate this error for CORRECT programs. (Try running
+  # the correct bubblesort2 through CORE without this. You will get
+  # Loader.main and NewThread.<init> errors until you run out of generations.)
+  if excText.find("Loader.main") > 0 and excText.find("NewThread.<init>") > 0:
+    return False;
+
   if excText is not None and excText.find("putfield") > 0  \
     and excText.find("getfield") > 0 \
     and re.search("(\S+)\.(\S+)\((\S+)", excText) is not None:
@@ -232,7 +239,8 @@ def getInfoInDatarace():
       continue
 
     # Loader.main and NewThread.<init> are not classes or methods
-    # from the code under test. They are dataraces though.
+    # from the code under test. Should be caught by checker fun, but just
+    # in case.
     if aClass.find("Loader") > 0 and aMeth.find("main") > 0:
       continue
     if aClass.find("NewThread") > 0 and aMeth.find("<init>") > 0:
