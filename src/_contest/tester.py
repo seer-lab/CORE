@@ -64,7 +64,14 @@ class Tester():
       os.makedirs(conTestLogDir)
 
     logger.debug("Performing {} Test Runs...".format(runs))
-    for i in range(1, runs + 1):
+    # Sometimes a situation occurs where there are 149 successes in 150 test
+    # runs. One test vanishes so the program is still marked incorrect, when
+    # it is actually correct.
+    i = 0
+    while self.errors + self.successes + self.dataraces + self.deadlocks \
+      + self.timeouts < runs:
+      i += 1
+    #for i in range(1, runs + 1):
 
       # To ensure stdout doesn't overflow because .poll() can deadlock
       outFile = tempfile.SpooledTemporaryFile()
@@ -226,7 +233,7 @@ class Tester():
           else:
             totalSuccesses = numSuccesses
 
-          # No tests were ran, thus some error occurred
+          # No tests were run, thus some error occurred
           if totalSuccesses is 0:
             logger.info("Test {} - Error, no tests ran".format(i))
             self.errors += 1

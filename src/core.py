@@ -51,7 +51,13 @@ logger = logging.getLogger('core')
 _OS = "MAC"
 
 def main():
-  """The entry point to CORE, to start the evolutionary approach."""
+  """CORE starts here.
+
+  Arguments
+    Your soul
+  Returns
+    Eternal damnation (Or a PhD)
+  """
 
   global _OS
 
@@ -161,10 +167,11 @@ def main():
     static.run_chord_datarace()
     static.get_chord_targets()
     static.load_contest_list()
-    static.create_final_triple()
 
   # Primitive types (int, float, ...) cannot be locked on
   static.eliminate_primitives()
+  static.create_final_triple()
+
   # Write the discovered values to file right away. The
   # final values are written in the finally block of
   # evolution.start() at the end of the run.

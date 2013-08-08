@@ -12,8 +12,8 @@ _primitivevars = [('ManageAccount', 'num'), ('ManageAccount', 'i'), ('Account', 
 
 [AccountsTest]
 _classvar = [('Account', 'random'), ('Bank', 'accounts')]
-_classmeth = [(u'Bank', u'Service')]
-_classmethvar = [(u'Bank', u'Service', 'accounts')]
+_classmeth = []
+_classmethvar = []
 _primitivevars = [('Bank', 'Bank_Total'), ('Account', 'Balance'), ('Account', 'Account_Id'), ('Account', 'MAX_SUM')]
 
 [DeadlockTest]
@@ -30,8 +30,8 @@ _primitivevars = [('BuggyProgram', 'randomNumber'), ('BuggyProgram$User', 'userN
 
 [PingPongTest]
 _classvar = [('BugThread', 'bg'), ('BuggedProgram', 'pingPongPlayer')]
-_classmeth = [(u'BuggedProgram', u'pingPong')]
-_classmethvar = [(u'BuggedProgram', u'pingPong', 'pingPongPlayer')]
+_classmeth = []
+_classmethvar = []
 _primitivevars = [('BuggedProgram', 'bugAppearanceNumber'), ('PingPong', 'i')]
 
 [StringBufferTest]
@@ -39,4 +39,10 @@ _classvar = [('StringBufferTester', 'al1'), ('StringBufferTester', 'al2'), ('Str
 _classmeth = []
 _classmethvar = []
 _primitivevars = [('StringBuffer', 'shared'), ('StringBuffer', 'count'), ('StringBufferTester', 'choice')]
+
+[tspTest]
+_classvar = [('TspSolver', 'TourLock'), ('TspSolver', 'Tours'), ('TspSolver', 'Visit'), ('TspSolver', 'weights'), ('TspSolver', 'MinLock')]
+_classmeth = []
+_classmethvar = []
+_primitivevars = [('TspSolver', 'TourStackTop'), ('TspSolver', 'TourStack'), ('TspSolver', 'MinTour'), ('Tsp', 'StartNode'), ('TourElement', 'prefix'), ('TspSolver', 'Path'), ('TspSolver', 'Done'), ('TourElement', 'prefix_weight'), ('Tsp', 'NodesFromEnd'), ('Tsp', 'TspSize'), ('TourElement', 'last'), ('TspSolver', 'MinTourLen'), ('PrioQElement', 'priority'), ('PrioQElement', 'index'), ('TspSolver', 'PrioQ'), ('TspSolver', 'PrioQLast')]
 

@@ -346,7 +346,8 @@ def add_JPF_lock_list(JPFList):
 # ------------ Database of Static Analysis ---------------
 
 def find_static_in_db(projectName):
-  """
+  """Look in src/staticDB.txt to see if the static analysis of this project
+  has been done already. If so, re-use it.
 
   """
 
@@ -373,7 +374,13 @@ def find_static_in_db(projectName):
 
 
 def write_static_to_db(projectName):
-  """
+  """Write the values of the static analysis to src/staticDB.txt.
+  This is done twice:
+  - At the beginning. If the run crashes or is interrupted we dont'
+    lose it.
+  - At the end. Write any new classes, methods or variables used
+    concurrently that were found by the techniques used (noising,
+    model checking, ...)
 
   """
 
@@ -400,6 +407,10 @@ def write_static_to_db(projectName):
 # ------------- Primitive Type Elimination ---------------
 
 def eliminate_primitives():
+  """Java program cannot synchronize on primitive types.  An optimization
+  is to remove them from the list of variables CORE uses to synchronize
+  on.
+  """
   # As we are removing this from the list, we must traverse it in reverse
   # order to access all items.
   for aTuple in reversed(_classVar):
@@ -472,7 +483,8 @@ def search_files_for_primitives(primTuple):
 
 def is_variable_primitive(thisVar):
   for aTuple in _primitiveVars:
-    #logger.debug("Comparing primitive {} to {}".format(aTuple[-1], thisVar[-1]))
+    logger.debug("Comparing primitive {} to {}".format(aTuple[-1], thisVar[-1]))
+    logger.debug("For tuples {} and {}".format(aTuple, thisVar))
     if aTuple[-1] is thisVar[-1]:
       return True
 
