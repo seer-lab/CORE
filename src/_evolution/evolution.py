@@ -7,6 +7,7 @@ Copyright ARC, David Kelk and Kevin Jalbert, 2012
 from __future__ import division
 import random
 import sys
+import os
 from individual import Individual
 import math
 import traceback
@@ -20,6 +21,7 @@ import hashlist
 import static
 from py4j.java_gateway import JavaGateway
 from _jpf import run_jpf
+from send2trash import send2trash
 import logging
 
 
@@ -77,7 +79,7 @@ def initialize(bestIndividual=None):
       #logger.debug("Creating individual {}".format(i))
       individual = Individual(mutationOperators, i)
     else:  # Non-functional phase
-      logger.debug("Cloning best functional individual {} into individual {}".format(
+      logger.debug("Cloning repaired individual {} into individual {}".format(
                    bestIndividual.id, i))
       individual = bestIndividual.clone(mutationOperators, i)
 
@@ -178,8 +180,7 @@ def start():
         bestOptimization.id)
 
 
-    # Phase 1 didn't find a fix, so we don't start phase 2 regardless of whether
-    # it is enabled or not
+    # Phase 1 didn't find a fix, so we don't start phase 2
     else:
       logger.info("No individual was found that functions correctly")
 
@@ -188,18 +189,28 @@ def start():
     # logger.info("Here is the entire population:")
     # logger.info(_population)
     # logger.info("------------------------------")
-    # logger.info("Note: Results of the run can be found before the listing of the population.")
+    # logger.info("Note: Results of the run can be found before the listing \
+    #    of the population.")
     # logger.info("(Scroll up)")
 
   except:
-    logger.error("evolution.start: Unexpected error:\n", traceback.print_exc(file=sys.stdout))
+    logger.error("evolution.start: Unexpected error:\n", \
+      traceback.print_exc(file=sys.stdout))
   finally:
+    # Save the final results of the static analysis to file.  See
+    # static.write_static_to_db for details.
     if len(static._classVar) > 0 or len(static._classMeth) > 0 \
       or len(static._classMethVar) > 0:
       static.write_static_to_db(config._PROJECT_TESTSUITE)
       logger.debug("Wrote static records to disk in section {}" \
         .format(config._PROJECT_TESTSUITE))
 
+    # Delete all the remaining tmp\gen\mem\source directories
+    for gen in xrange(1,config._EVOLUTION_GENERATIONS+1):
+      for mem in xrange(1, config._EVOLUTION_POPULATION+1):
+        sourceDir = os.path.join(config._TMP_DIR, str(gen), str(mem), "source")
+        if os.path.isdir(sourceDir):
+          send2trash(sourceDir)
 
 def evolve(generation=0, worstScore=0):
   """This function is the workhorse for CORE: Both the fixing and

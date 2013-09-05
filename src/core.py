@@ -96,6 +96,7 @@ def main():
   static.setup()
 
   # Acquire classpath dynamically using 'ant test'
+  logger.debug("Configuring classpath")
   if config._PROJECT_CLASSPATH is None:
     outFile = tempfile.SpooledTemporaryFile()
     errFile = tempfile.SpooledTemporaryFile()

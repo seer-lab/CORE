@@ -1,6 +1,7 @@
 %***********************************************************
-% ASIM (Add Sync in Method Header) Mutator for ARC
-% (Automatic Repair of Concurrency Bugs)
+% ASM_CMV (Add Sync around a Method from ConTest) Mutator for ARC
+% (Automatic Repair of Concurrency Bugs) with class, method and
+% variable targeting information (_CMV)
 %
 % Copyright David Kelk and Kevin Jalbert, 2012
 %           David Kelk, 2013
@@ -8,8 +9,8 @@
 % Based on ASK by J.S. Bradbury
 %
 % Typical invocation:
-% txl ManageAccount.java ASIM.Txl - -outfile ManageAccount_1.java
-% -outdir ASIM/ -class ManageAccount -method run
+% txl ManageAccount.java ASM.Txl - -outfile ManageAccount_1.java
+% -outdir ASM/ -class ManageAccount -method run -syncvar gbk
 %
 % Notes:
 % - Java files must be named _1.java, _2.java due to the fact
@@ -40,45 +41,64 @@
 include "Java.Grm"
 include "JavaCommentOverrides.Grm"
 
-% Local grammar overrides
+% Before and after for the method (Where the mutant comments go)
 redefine method_or_constructor_declaration
-	  [attr labelM] [method_declaration]
-	| [attr labelM] /* 'MUTANT: [stringlit] */ [method_declaration] /* 'MUTANT: [stringlit] */
-	| [attr labelM] [constructor_declaration]
+    [attr labelM] [method_declaration]
+  |
+    [attr labelM] /* 'MUTANT: [stringlit] */
+    [method_declaration]
+    /* 'MUTANT: [stringlit] */ [NL]
+  |
+    [attr labelM] [constructor_declaration]
 end redefine
-
-redefine method_declaration
-  [NL] [repeat modifier] [rest_of_method_declaration]
-end redefine
-
-define rest_of_method_declaration
-	[type_specifier] [method_declarator] [opt throws] [method_body]
-end define
 
 define labelM
   'MUTATED
 end define
 
+redefine method_declaration
+  [NL] [repeat modifier] [type_specifier] [rest_of_method_declaration]
+end redefine
+
+define rest_of_method_declaration
+  [method_declarator] [opt throws] [method_body]
+end define
+
+% Before and after for the block (Where the synchronization goes)
+
+redefine block
+    '{                                        [NL][IN]
+        [repeat declaration_or_statement]     [EX]
+    '}
+   |
+    '{ [NL][IN]
+        'synchronized '( [id] ') [NL]
+        '{ [NL][IN]
+          [repeat declaration_or_statement]     [EX]
+        '}
+    '}
+end redefine
+
 %------------------------------------------------------------
 % Main rule, followed by other rules in topological order
 %------------------------------------------------------------
 function main
-	% initialize and export a mutant count that will be used in
-	% file name / folder name generation
-    	construct MutantCount [number]
-		0
-    	export MutantCount
+  % initialize and export a mutant count that will be used in
+  % file name / folder name generation
+      construct MutantCount [number]
+    0
+      export MutantCount
 
-	% initialize and export the name of the current mutant which
-	% will be used for folder name generation
-	construct MutantOpName [stringlit]
-		"ASIM"
-	export MutantOpName
+  % initialize and export the name of the current mutant which
+  % will be used for folder name generation
+  construct MutantOpName [stringlit]
+    "ASM_CMV"
+  export MutantOpName
 
   % Read in name of class and variable from ConTest
   import TXLargs [repeat stringlit]
     deconstruct * TXLargs
-      "-class" clsNm [stringlit] "-method" mthNm [stringlit]  MoreOptions [repeat stringlit]
+      "-class" clsNm [stringlit] "-method" mthNm [stringlit] "-syncvar" syncNm [stringlit] MoreOptions [repeat stringlit]
 
   construct className [id]
     _ [unquote clsNm]
@@ -88,6 +108,9 @@ function main
     _ [unquote mthNm]
   export methodName
 
+  construct syncvarName [id]
+    _ [unquote syncNm]
+  export syncvarName
 
   replace [program]
     P [program]
@@ -113,7 +136,7 @@ rule ProcessSynchronizeStatementMutations
       %[print]
       [writeToFile]
       % Undo mutation and return to original program
-      [undoSynchronizeStatementMutation]
+      [undoSynchronizedInsertMutation]
 end rule
 
 %------------------------------------------------------------
@@ -182,10 +205,10 @@ function IdentifyMutationMethod
     MethName [isSameMethod methodName]
 
   where
-    AMethod [?doSynchronizeStatementMutation]
+    AMethod [?doSynchronizedInsertMutation]
 
   by
-    AMethod [doSynchronizeStatementMutation]
+    AMethod [doSynchronizedInsertMutation]
 end function
 
 %---------------------
@@ -200,76 +223,95 @@ end rule
 %------------------------------------------------------------
 %
 %------------------------------------------------------------
-function doSynchronizeStatementMutation
-	replace * [method_or_constructor_declaration]
-		GenDecl [method_or_constructor_declaration]
+function doSynchronizedInsertMutation
 
-	deconstruct GenDecl
-		MethodDecl [method_declaration]
+  replace * [method_or_constructor_declaration]
+    GenDecl [method_or_constructor_declaration]
 
-	deconstruct MethodDecl
-		MethodModifiers [repeat modifier]
-		RemainingDelcaration [rest_of_method_declaration]
+  deconstruct GenDecl
+    MethodDecl [method_declaration]
 
-	% check that the synchronized modifier is not present
-	where not
-		MethodModifiers [hasSynchronizedKeyword]
+  % export the old declaration and reinsert it
+  % once the mutant has been created and saved
+  export GenDecl
 
-	% create new list of modifiers
-	construct SynchronizedModifier [modifier]
-		'synchronized
-	construct NewMethodModifiers [repeat modifier]
-		MethodModifiers [. SynchronizedModifier]
+  deconstruct MethodDecl
+    MethodModifiers [repeat modifier]
+    TypeSpec [type_specifier]
+    RemainingDeclaration [rest_of_method_declaration]
 
-	% export the old declaration and reinsert it
-	% once the mutant has been created and saved
-	export GenDecl
+  deconstruct RemainingDeclaration
+    MD [method_declarator]
+    OT [opt throws]
+    MB [method_body]
 
-	% create mutant comment to appear in source
-	construct MutantString [stringlit]
-		"ASIM (Add Sync In Method declaration)"
-	by
-		% generate hidden attribute and comment
-		'MUTATED /* 'MUTANT: MutantString */
-		% populate new modifier list with all existing modifiers
-		% plus synchronized
-		NewMethodModifiers
-		% reinsert rest of method declaration
-		RemainingDelcaration
+  deconstruct MB
+    BL [block]
+
+  deconstruct BL
+    '{
+        DOS [repeat declaration_or_statement]
+    '}
+
+  import syncvarName [id]
+
+  % create new block
+  construct SynchBlock [block]
+    '{
+      'synchronized '( syncvarName ')
+      '{
+        DOS
+      '}
+    '}
+
+  construct NewBody [method_body]
+    SynchBlock
+
+  construct NewRemDecl [rest_of_method_declaration]
+    MD OT NewBody
+
+  construct NewMethodDecl [method_declaration]
+    MethodModifiers TypeSpec NewRemDecl
+
+  construct NewGenDecl [method_declaration]
+    NewMethodDecl
+
+  % create mutant comment to appear in source
+  construct MutantString [stringlit]
+    "ASM (Add Sync around a Method from ConTest)"
+
+  by
+    % generate hidden attribute and comment
+    'MUTATED /* 'MUTANT: MutantString */
+    NewMethodDecl
     /* 'MUTANT: MutantString */
 end function
 
 %------------------------------------------------------------
 %
 %------------------------------------------------------------
-function undoSynchronizeStatementMutation
-	replace * [method_or_constructor_declaration]
-		CurrGenDecl [method_or_constructor_declaration]
+function undoSynchronizedInsertMutation
+  replace * [method_or_constructor_declaration]
+    CurrGenDecl [method_or_constructor_declaration]
 
-	% Import the old declaration
-	import GenDecl [method_or_constructor_declaration]
+  % Import the old declaration
+  import GenDecl [method_or_constructor_declaration]
 
-	% extract method declaration
-	deconstruct GenDecl
-		SavedMethodDecl [method_declaration]
+  % extract method declaration
+  deconstruct GenDecl
+    SavedMethodDecl [method_declaration]
 
-	deconstruct CurrGenDecl
-		'MUTATED /* 'MUTANT: MutantString1 [stringlit] */
-		CurrMethodDecl [method_declaration]
-    /* 'MUTANT: MutantString2 [stringlit] */
-	by
-		% replace mutated declaration with original
-		% but leave hidden attribute
-		'MUTATED SavedMethodDecl
+  deconstruct CurrGenDecl
+    'MUTATED /* 'MUTANT: MutStr1 [stringlit] */
+    CurMethDecl [method_declaration]
+    /* 'MUTANT: MutStr2 [stringlit] */
+
+  by
+    % replace mutated declaration with original
+    % but leave hidden attribute
+    'MUTATED SavedMethodDecl
+
 end function
-
-%------------------------------------------------------------
-% Check if method modifier list includes synchronized
-%------------------------------------------------------------
-rule hasSynchronizedKeyword
-	match * [modifier]
-		'synchronized
-end rule
 
 %Include rules for writing mutants to files
 include "WriteMutants.Txl"

@@ -30,16 +30,13 @@ logger = logging.getLogger('core')
 # improved by finding which ones are used concurrently. There are different
 # tools that can do this - like Chord, a static analysis tool and ConTest,
 # which we use for noising. Different tools return different information -
-# like the Class and variable used concurrently or the class and variable
+# like the Class and variable used concurrently or the class and method
 # used concurrently.
 # This file contains methods to collect the classes, methods and variables
 # found with the ultimate goal of producing a list of (class, method,
 # variable) (c, m , v) triples.
 # If the (c, m, v) information isn't available, we may still have (c, m)
 # or (c, v) information to work with.
-
-# TODO: Record the results of the static analysis so it doesn't have to
-#       be run every time.
 
 _contestFoundVars = False
 
@@ -177,6 +174,8 @@ def get_chord_targets():
       aVar = stmtOne.group(2)
       if aClass is None or aVar is None:
         continue
+      if "$" in aClass:    # From classA$classB, keep classA
+        aClass = aClass.split("$")[-2]
       aTuple = (aClass, aVar)
       if aTuple not in _classVar and not is_variable_primitive(aTuple):
         logger.debug("(Case 1) Adding {} to _classVar".format(aTuple))
@@ -209,6 +208,8 @@ def get_chord_targets():
         aMeth = stmtTwo.group(2)
         if aClass is None or aMeth is None:
           continue
+        if "$" in aClass:    # From classA$classB, keep classA
+          aClass = aClass.split("$")[-2]
         aTuple = (aClass, aMeth)
         if aTuple not in _classMeth:
           logger.debug("(Case 2) Adding {} to _classMeth".format(aTuple))
@@ -225,6 +226,8 @@ def get_chord_targets():
 # ----------------------- Utility -----------------------
 
 def create_final_triple():
+  """
+  """
   if len(_classMeth) == 0 or len(_classVar) == 0:
     #logger.debug("Couldn't create the list of (class, method, variable) triples")
     #logger.debug("One or both of the static analysis and ConTest shared variable detection didn't")
@@ -240,7 +243,7 @@ def create_final_triple():
       aTriple = (cmTuple[-2], cmTuple[-1], cvTuple[-1]) # Class, method, variable
       if aTriple not in _classMethVar and not is_variable_primitive(aTriple):
         logger.debug("Adding triple {} to _classMethVar".format(aTriple))
-      #  _classMethVar.append(aTriple)
+        _classMethVar.append(aTriple)
       #else:
       #  logger.debug("{} was rejected because it is either in _classMethVar".format(aTriple))
       #  logger.debug("already, or the variable part is a primitive type.")
@@ -276,6 +279,8 @@ def did_contest_find_shared_variables():
 
 
 def load_contest_list():
+  """
+  """
 
   global _contestFoundVars
 
@@ -288,6 +293,8 @@ def load_contest_list():
   for line in open(config._SHARED_VARS_FILE, 'r'):
     variableName = line.split('.')[-1].strip(' \t\n\r')
     className = line.split('.')[-2].strip(' \t\n\r')
+    if "$" in className:    # From classA$classB, keep classA
+      className = className.split("$")[-2]
     aTuple = (className, variableName)
     if aTuple not in _classVar and not is_variable_primitive(aTuple):
       logger.debug("Added {} to _classVar".format(aTuple))
@@ -296,7 +303,7 @@ def load_contest_list():
     #    logger.debug("{} was rejected because it is either in _classVar".format(aTuple))
     #    logger.debug("already, or the variable part is a primitive type.")
 
-  logger.info("Populated class.variable list with ConTest data")
+  logger.info("Populated _classVar list with ConTest data")
   _contestFoundVars = True
   create_final_triple()
   return True
@@ -315,6 +322,9 @@ def add_JPF_race_list(JPFlist):
 
   for aTuple in JPFlist:
     if aTuple not in _classMeth:
+      if "$" in aTuple[-2]:    # From classA$classB, keep classA
+        tempTuple = (aTuple[-2].split("$")[-2], aTuple[-1])
+        aTuple = tempTuple
       _classMeth.append(aTuple)
       logger.debug("{} is new. Adding it to _classMeth.".format(aTuple))
     #else:
@@ -333,8 +343,12 @@ def add_JPF_lock_list(JPFList):
   """
 
   for aItem in JPFList:
+    if "$" in aItem:    # From classA$classB, keep classA
+      aItem = aItem.split("$")[-2]
     for aTuple in _classMeth:
-      newTuple = (aItem, aTuple[1])
+      newTuple = (aItem, aTuple[-1])
+      logger.debug("From class {} and classmeth tuple {}, adding {} to classmeth'") \
+        .format(aItem, aTuple, newTuple)
       if newTuple not in _classMeth:
         _classMeth.append(newTuple)
         logger.debug("{} is new. Adding it to _classMeth.".format(aTuple))

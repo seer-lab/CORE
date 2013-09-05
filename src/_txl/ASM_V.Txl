@@ -1,7 +1,7 @@
 %***********************************************************
-% ASM_C (Add Sync around a Method from ConTest) Mutator for ARC
+% ASM_lineCV[-2] (Add Sync around a Method from ConTest) Mutator for ARC
 % (Automatic Repair of Concurrency Bugs)
-% With only class (_C) targeting information
+% With variable targeting information (_V)
 %
 % Copyright David Kelk and Kevin Jalbert, 2012
 %           David Kelk, 2013
@@ -9,8 +9,8 @@
 % Based on ASK by J.S. Bradbury
 %
 % Typical invocation:
-% txl ManageAccount.java ASM.Txl - -outfile ManageAccount_1.java
-% -outdir ASM/ -class ManageAccount -syncvar gbk
+% txl ManageAccount.java ASM_RND.Txl - -outfile ManageAccount_1.java
+% -outdir ASM/ -syncvar gbk
 %
 % Notes:
 % - Java files must be named _1.java, _2.java due to the fact
@@ -92,17 +92,13 @@ function main
   % initialize and export the name of the current mutant which
   % will be used for folder name generation
   construct MutantOpName [stringlit]
-    "ASM"
+    "ASM_V"
   export MutantOpName
 
   % Read in name of class and variable from ConTest
   import TXLargs [repeat stringlit]
     deconstruct * TXLargs
-      "-class" clsNm [stringlit] "-syncvar" syncNm [stringlit] MoreOptions [repeat stringlit]
-
-  construct className [id]
-    _ [unquote clsNm]
-  export className
+      "-syncvar" syncNm [stringlit] MoreOptions [repeat stringlit]
 
   construct syncvarName [id]
     _ [unquote syncNm]
@@ -128,7 +124,8 @@ rule ProcessSynchronizeStatementMutations
   where
     P [?IdentifyMutationClass]
   by
-    P [IdentifyMutationClass]
+    P [doSynchronizedInsertMutation]
+      %[IdentifyMutationClass]
       %[print]
       [writeToFile]
       % Undo mutation and return to original program
@@ -146,18 +143,6 @@ end rule
 function IdentifyMutationClass
   replace * [class_declaration]
     AClass [class_declaration]
-
-  deconstruct AClass
-    AClassHead [class_header] AClassBody [class_body]
-
-  deconstruct AClassHead
-      Mod [repeat modifier] 'class AClassName [class_name]
-      EC [opt extends_clause] IM [opt implements_clause]
-
-  import className [id]
-
-  where
-    AClassName [isSameClass className]
 
   where
     AClass [?doSynchronizedInsertMutation]

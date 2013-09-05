@@ -1,8 +1,7 @@
 %***********************************************************
-% ASAT (Add Sync Around Statement) Mutator for ARC
+% ASM_CV (Add Sync around a Method from ConTest) Mutator for ARC
 % (Automatic Repair of Concurrency Bugs)
-% -var: A statement must contain var for it to be synchronized
-% -syncvar: Synchronization variable synchronized(syncvar)
+% With only class and variable (_CV) targeting information
 %
 % Copyright David Kelk and Kevin Jalbert, 2012
 %           David Kelk, 2013
@@ -10,7 +9,8 @@
 % Based on ASK by J.S. Bradbury
 %
 % Typical invocation:
-% txl ManageAccount.java ASAT.Txl - -outfile ManageAccount_1.java -outdir ASAT/ -class ManageAccount -method run -var account -syncvar coolness
+% txl ManageAccount.java ASM.Txl - -outfile ManageAccount_1.java
+% -outdir ASM/ -class ManageAccount -syncvar gbk
 %
 % Notes:
 % - Java files must be named _1.java, _2.java due to the fact
@@ -41,86 +41,72 @@
 include "Java.Grm"
 include "JavaCommentOverrides.Grm"
 
-% Local grammar overrides
-
-redefine statement
-        [sync_other_statement]
-    |   [attr labelM] [other_statement]
+% Before and after for the method (Where the mutant comments go)
+redefine method_or_constructor_declaration
+    [attr labelM] [method_declaration]
+  |
+    [attr labelM] /* 'MUTANT: [stringlit] */
+    [method_declaration]
+    /* 'MUTANT: [stringlit] */ [NL]
+  |
+    [attr labelM] [constructor_declaration]
 end redefine
-
-define other_statement
-        [label_statement]
-    |   [empty_statement]
-    |   [expression_statement]
-    |   [if_statement]
-    |   [switch_statement]
-    |   [while_statement]
-    |   [do_statement]
-    |   [for_statement]
-    |   [break_statement]
-    |   [continue_statement]
-    |   [return_statement]
-    |   [throw_statement]
-    |   [synchronized_statement]
-    |   [try_statement]
-    |   [block]
-end define
-
-% How it looks after mutation
-% - For parsing, labels are considered optional
-
-define sync_other_statement
-  [attr labelM] /* 'MUTANT: [stringlit] */  [NL]
-  'synchronized '( [id] ')
-  '{ [NL][IN]
-    [other_statement]
-  '}   [NL]
-  /* 'MUTANT: [stringlit] */  [NL]
-end define
 
 define labelM
   'MUTATED
 end define
 
+redefine method_declaration
+  [NL] [repeat modifier] [type_specifier] [rest_of_method_declaration]
+end redefine
+
+define rest_of_method_declaration
+  [method_declarator] [opt throws] [method_body]
+end define
+
+% Before and after for the block (Where the synchronization goes)
+
+redefine block
+    '{                                        [NL][IN]
+        [repeat declaration_or_statement]     [EX]
+    '}
+   |
+    '{ [NL][IN]
+        'synchronized '( [id] ') [NL]
+        '{ [NL][IN]
+          [repeat declaration_or_statement]     [EX]
+        '}
+    '}
+end redefine
+
 %------------------------------------------------------------
-% Main
-% - Prepare import and export variables
-%   - clsNm/className: Targeted class
-%   - varNm/variableName: Targeted variable
+% Main rule, followed by other rules in topological order
 %------------------------------------------------------------
 function main
   % initialize and export a mutant count that will be used in
   % file name / folder name generation
-  construct MutantCount [number]
+      construct MutantCount [number]
     0
-  export MutantCount
+      export MutantCount
 
   % initialize and export the name of the current mutant which
   % will be used for folder name generation
   construct MutantOpName [stringlit]
-    "ASAT"
+    "ASM_CV"
   export MutantOpName
 
   % Read in name of class and variable from ConTest
   import TXLargs [repeat stringlit]
     deconstruct * TXLargs
-      "-class" clsNm [stringlit] "-method" mthNm [stringlit] "-var" varNm [stringlit] "-syncvar" synVr [stringlit] MoreOptions [repeat stringlit]
+      "-class" clsNm [stringlit] "-syncvar" syncNm [stringlit] MoreOptions [repeat stringlit]
 
   construct className [id]
     _ [unquote clsNm]
   export className
 
-  construct methodName [id]
-    _ [unquote mthNm]
-  export methodName
-
-  construct variableName [id]
-    _ [unquote varNm]
-  export variableName
-
-  construct synchVar [id]
-    _ [unquote synVr]
-  export synchVar
+  construct syncvarName [id]
+    _ [unquote syncNm]
+  export syncvarName
 
   replace [program]
     P [program]
@@ -146,7 +132,7 @@ rule ProcessSynchronizeStatementMutations
       %[print]
       [writeToFile]
       % Undo mutation and return to original program
-      [undoSynchronizeStatementMutation]
+      [undoSynchronizedInsertMutation]
 end rule
 
 %------------------------------------------------------------
@@ -174,10 +160,10 @@ function IdentifyMutationClass
     AClassName [isSameClass className]
 
   where
-    AClass [?IdentifyMutationMethod]
+    AClass [?doSynchronizedInsertMutation]
 
   by
-    AClass [IdentifyMutationMethod]
+    AClass [doSynchronizedInsertMutation]
 end function
 
 %---------------------
@@ -190,111 +176,96 @@ rule isSameClass ClsName [id]
 end rule
 
 %------------------------------------------------------------
-% Next, match the method name
-% - Deconstruct a method declaration to get the [class_name]
-% - Efficiency: Don't import a variable [methodName] until it
-%   is needed
-% - Efficiency: Don't call [?DoSynchronizestatementMutation]
-%   until the proper class has been identified
+%
 %------------------------------------------------------------
-function IdentifyMutationMethod
-  replace * [method_declaration]
-    AMethod [method_declaration]
+function doSynchronizedInsertMutation
 
-  deconstruct AMethod
-    MethMods [repeat modifier] MethType [type_specifier]
-    MethDecl [method_declarator] MethThr [opt throws]
-    MethBody [method_body]
+  replace * [method_or_constructor_declaration]
+    GenDecl [method_or_constructor_declaration]
 
-  deconstruct MethDecl
-    MethName [method_name] '( MethList [list formal_parameter]') MethDim [repeat dimension]
+  deconstruct GenDecl
+    MethodDecl [method_declaration]
 
-  import methodName [id]
+  % export the old declaration and reinsert it
+  % once the mutant has been created and saved
+  export GenDecl
 
-  where
-    MethName [isSameMethod methodName]
+  deconstruct MethodDecl
+    MethodModifiers [repeat modifier]
+    TypeSpec [type_specifier]
+    RemainingDeclaration [rest_of_method_declaration]
 
-  where
-    AMethod [?doSynchronizeStatementMutation]
+  deconstruct RemainingDeclaration
+    MD [method_declarator]
+    OT [opt throws]
+    MB [method_body]
+
+  deconstruct MB
+    BL [block]
+
+  deconstruct BL
+    '{
+        DOS [repeat declaration_or_statement]
+    '}
+
+  import syncvarName [id]
+
+  % create new block
+  construct SynchBlock [block]
+    '{
+      'synchronized '( syncvarName ')
+      '{
+        DOS
+      '}
+    '}
+
+  construct NewBody [method_body]
+    SynchBlock
+
+  construct NewRemDecl [rest_of_method_declaration]
+    MD OT NewBody
+
+  construct NewMethodDecl [method_declaration]
+    MethodModifiers TypeSpec NewRemDecl
+
+  construct NewGenDecl [method_declaration]
+    NewMethodDecl
+
+  % create mutant comment to appear in source
+  construct MutantString [stringlit]
+    "ASM (Add Sync around a Method from ConTest)"
 
   by
-    AMethod [doSynchronizeStatementMutation]
+    % generate hidden attribute and comment
+    'MUTATED /* 'MUTANT: MutantString */
+    NewMethodDecl
+    /* 'MUTANT: MutantString */
 end function
-
-%---------------------
-% Match the method name
-%---------------------
-
-rule isSameMethod MthName [id]
-  match * [id]
-    MthName
-end rule
 
 %------------------------------------------------------------
 %
 %------------------------------------------------------------
-function doSynchronizeStatementMutation
+function undoSynchronizedInsertMutation
+  replace * [method_or_constructor_declaration]
+    CurrGenDecl [method_or_constructor_declaration]
 
-  replace * [statement]
-    AStmt [statement]
+  % Import the old declaration
+  import GenDecl [method_or_constructor_declaration]
 
-  import variableName [id]
+  % extract method declaration
+  deconstruct GenDecl
+    SavedMethodDecl [method_declaration]
 
-  where
-    AStmt [ContainsID variableName]
-
-  deconstruct AStmt
-    OtherStatement [other_statement]
-
-  % create mutant comment to appear in source
-  construct MutantString [stringlit]
-    "ASAT (Added Sync Around Statement)"
-
-  import synchVar [id]
+  deconstruct CurrGenDecl
+    'MUTATED /* 'MUTANT: MutStr1 [stringlit] */
+    CurMethDecl [method_declaration]
+    /* 'MUTANT: MutStr2 [stringlit] */
 
   by
-    'MUTATED /* 'MUTANT: MutantString */
-    'synchronized '( synchVar ')
-    '{
-      OtherStatement
-    '}
-    /* 'MUTANT: MutantString */
-end function
+    % replace mutated declaration with original
+    % but leave hidden attribute
+    'MUTATED SavedMethodDecl
 
-%---------------------
-% Match the variable name in the statement
-%---------------------
-
-rule ContainsID VarName [id]
-  match * [id]
-    VarName
-end rule
-
-%------------------------------------------------------------
-% Reinsert the orginal statement declaration but leave the
-% MUTATED attribute to indicate that the mutant has already
-% been created.
-%------------------------------------------------------------
-function undoSynchronizeStatementMutation
-  replace * [statement]
-      AStmt [statement]
-
-  deconstruct AStmt
-      SyncStmt [sync_other_statement]
-
-  deconstruct SyncStmt
-    'MUTATED /* 'MUTANT: MutantStr1 [stringlit] */
-    'synchronized '( synchVar [id] ')
-    '{
-      OthStmt [other_statement]
-    '}
-    /* 'MUTANT: MutantStr2 [stringlit] */
-
-  by
-    % replace mutated statement with original but
-    % leave hidden attribute
-    'MUTATED
-      OthStmt
 end function
 
 %Include rules for writing mutants to files
