@@ -24,7 +24,7 @@ import urllib2
 from bs4 import BeautifulSoup
 import ConfigParser
 import logging
-logger = logging.getLogger('core')
+logger = logging.getLogger('output-log')
 
 # The targeting of classes, methods and variables for mutation can be
 # improved by finding which ones are used concurrently. There are different

@@ -19,7 +19,7 @@ import tempfile
 import re
 import time
 import logging
-logger = logging.getLogger('core')
+logger = logging.getLogger('output-log')
 
 # Global variables
 _jpfLauncher = None

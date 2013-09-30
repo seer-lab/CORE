@@ -46,7 +46,7 @@ from _evolution import static
 from send2trash import send2trash
 
 import logging
-logger = logging.getLogger('core')
+logger = logging.getLogger('output-log')
 
 _OS = "MAC"
 
