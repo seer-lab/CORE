@@ -1,6 +1,6 @@
 [AccountTest]
 _classvar = [('ManageAccount', 'account'), ('ManageAccount', 'accounts')]
-_classmeth = [(u'Account', u'transfer'), (u'Account', u'depsite')]
+_classmeth = []
 _classmethvar = []
 _primitivevars = [('ManageAccount', 'num'), ('ManageAccount', 'i'), ('Account', 'amount')]
 
@@ -26,7 +26,7 @@ _primitivevars = []
 _classvar = [('BuggyProgram', 'generated'), ('BuggyProgram', 'history'), ('BuggyProgram', 'presented')]
 _classmeth = []
 _classmethvar = []
-_primitivevars = [('BuggyProgram', 'randomNumber'), ('BuggyProgram$User', 'userNumber'), ('BuggyProgram', 'numOfUsers')]
+_primitivevars = [('BuggyProgram', 'randomNumber'), ('BuggyProgram', 'userNumber'), ('BuggyProgram', 'numOfUsers')]
 
 [PingPongTest]
 _classvar = [('BugThread', 'bg'), ('BuggedProgram', 'pingPongPlayer')]

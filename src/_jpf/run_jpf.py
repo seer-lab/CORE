@@ -107,11 +107,6 @@ def runJPF():
   # Create the configuration list for JPF. Note that we are creating a Java
   # array (of Strings), not a Python list
 
-  # Note: Trying to create JPF objects by specifying them as a parameter
-  #       here (eg: listener+= gov.nasa...BudgetChecker) doesn't work.
-  #       Instead, create them in the launchJPF.java class and add them
-  #       to JPF there. (See BudgetChecker as an example.)
-
   jpfConfig = pyGateway.new_array(pyGateway.jvm.java.lang.String, 10)
   jpfConfig[0] = config._JPF_CONFIG  # The .jpf file
   jpfConfig[1] = '+classpath=' + config._PROJECT_CLASS_DIR
@@ -123,8 +118,6 @@ def runJPF():
   jpfConfig[7] = '+log.level = info'
   jpfConfig[8] = '+log.output = jpfLog.txt'
   jpfConfig[9] = '+log.info = jpfLog' # Matches launchJPF.java
-
-  #jpfConfig[7] = 'log.output = JPFLog-' + str(individualID) + '-' + str(generation) + '.txt'
 
   # Invoke JPF through the gateway
   logger.debug("Running JPF.")

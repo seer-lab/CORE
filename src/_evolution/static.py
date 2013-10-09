@@ -380,10 +380,10 @@ def find_static_in_db(projectName):
   _classMeth     = configDBIn.get(projectName, "_classMeth")
   _classMethVar  = configDBIn.get(projectName, "_classMethVar")
   _primitiveVars = configDBIn.get(projectName, "_primitiveVars")
-  logger.debug("Read _classVar : {}".format(_classVar))
-  logger.debug("Read _classMeth: {}".format(_classMeth))
-  logger.debug("Read _classMethVar: {}".format(_classMethVar))
-  logger.debug("Read _primitiveVars: {}".format(_primitiveVars))
+  #logger.debug("Read _classVar : {}".format(_classVar))
+  #logger.debug("Read _classMeth: {}".format(_classMeth))
+  #logger.debug("Read _classMethVar: {}".format(_classMethVar))
+  #logger.debug("Read _primitiveVars: {}".format(_primitiveVars))
   return True
 
 
@@ -428,16 +428,16 @@ def eliminate_primitives():
   # As we are removing this from the list, we must traverse it in reverse
   # order to access all items.
   for aTuple in reversed(_classVar):
-    logger.debug("Checking if {} from _classVar is primitive.".format(aTuple))
+    #logger.debug("Checking if {} from _classVar is primitive.".format(aTuple))
     if search_files_for_primitives(aTuple):
-      logger.debug("Removing {} from _classVar".format(aTuple))
+      #logger.debug("Removing {} from _classVar".format(aTuple))
       _classVar.remove(aTuple)
 
   #logger.debug("Before _classMethVar: {}".format(_classMethVar))
   for aTuple in reversed(_classMethVar):
-    logger.debug("Checking if {} from _classMethVar is primitive.".format(aTuple))
+    #logger.debug("Checking if {} from _classMethVar is primitive.".format(aTuple))
     if search_files_for_primitives(aTuple):
-      logger.debug("Removing {} from _classMethVar".format(aTuple))
+      #logger.debug("Removing {} from _classMethVar".format(aTuple))
       _classMethVar.remove(aTuple)
 
 
@@ -448,7 +448,7 @@ def eliminate_primitives():
 def search_files_for_primitives(primTuple):
   """
   """
-  logger.debug("The input variable is {}.".format(primTuple))
+  #logger.debug("The input variable is {}.".format(primTuple))
 
   for root, dirs, files in os.walk(config._PROJECT_PRISTINE_SRC_DIR):
 
@@ -485,11 +485,11 @@ def search_files_for_primitives(primTuple):
 
         if aTuple is None:
           continue
-        logger.debug("Found tuple, {}.".format(aTuple))
+        #logger.debug("Found tuple, {}.".format(aTuple))
         if aTuple in _primitiveVars:
           continue
 
-        logger.debug("Adding tuple {} (from {}) to _primitiveVars.".format(aTuple, aFile))
+        #logger.debug("Adding tuple {} (from {}) to _primitiveVars.".format(aTuple, aFile))
         _primitiveVars.append(aTuple)
         return True
 

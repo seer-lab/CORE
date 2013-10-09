@@ -200,7 +200,8 @@ def generate_mutants(generation, memberNum, txlOperator, sourceFile, destDir):
   is the txlOperator to apply to a file.
 
   Example command line invocation:
-    txl account ASAT_CV.Txl - -outfile account_1_1 -outdir . -class account -var random -syncvar random
+    txl account ASAT_CV.Txl - -outfile account_1_1 -outdir . -class account
+    -var random -syncvar random
 
   Attributes:
   generation (int): Current generation of the evolutionary strategy
@@ -345,7 +346,7 @@ def generate_mutants(generation, memberNum, txlOperator, sourceFile, destDir):
 
     if static.do_we_have_CV():
       for lineCV in static._classVar:
-        logger.debug("ASAT_CV: Comparing {} to {}".format(sourceNameOnly, lineCV[-2]))
+        #logger.debug("ASAT_CV: Comparing {} to {}".format(sourceNameOnly, lineCV[-2]))
         if sourceNameOnly != lineCV[-2]:
           continue
 
