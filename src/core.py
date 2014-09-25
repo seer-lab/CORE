@@ -77,7 +77,6 @@ def main():
   outFile.seek(0)
   outText = outFile.read()
   outFile.close()
-  ourOS = 0 # 10 is Mac, 20 is Linux
   if re.search("Linux", outText):
     _OS = "LINUX"
   else:

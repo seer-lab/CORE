@@ -9,7 +9,7 @@
 % Based on ASK by J.S. Bradbury
 %
 % Typical invocation:
-% txl ManageAccount.java ASM_RND.Txl - -outfile ManageAccount_1.java
+% txl ManageAccount.java ASM_V.Txl - -outfile ManageAccount_1.java
 % -outdir ASM/ -syncvar gbk
 %
 % Notes:

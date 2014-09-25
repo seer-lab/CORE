@@ -77,7 +77,7 @@ define sync_other_statement
   [attr labelM] /* 'MUTANT: [stringlit] */  [NL]
   'synchronized '( [id] ')
   '{ [NL][IN]
-    [other_statement]
+    [other_statement] [EX]
   '}   [NL]
   /* 'MUTANT: [stringlit] */  [NL]
 end define

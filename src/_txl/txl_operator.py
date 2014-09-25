@@ -733,3 +733,111 @@ def move_best_project_to_output(generation, memberNum):
   if os.path.exists(config._PROJECT_OUTPUT_DIR):
     shutil.rmtree(config._PROJECT_OUTPUT_DIR)
   shutil.copytree(srcDir, config._PROJECT_OUTPUT_DIR)
+
+
+# -----------------------------------------------------------------------------
+#
+# Disallowed mutants
+#
+# -----------------------------------------------------------------------------
+
+def was_run_synchronized(srcDir):
+
+  for root, dirs, files in os.walk(srcDir):
+
+    for aFile in files:
+      if ("." in aFile and aFile.split(".")[1] == "java"):
+        sourceFile = os.path.join(root, aFile)
+
+        #logger.debug("Checking if run was synched in:")
+        #logger.debug("\n{}".format(sourceFile))
+
+        return check_synch_run_work(sourceFile)
+
+  return False
+
+
+def check_synch_run(generation, memberNum, txlOperator, mutantNum):
+
+  javaFile = uniqueMutants[(generation, memberNum, txlOperator, mutantNum)]
+
+  return check_synch_run_work(javaFile)
+
+# Important note: The src/_evolution/test_exclusion subdirectory contains
+#                 a test program for the regular expressions below. See
+#                 exclusion-tester.py for details.
+
+def check_synch_run_work(javaFile):
+  with open(javaFile) as f:
+    lines = f.read().splitlines()
+
+  inRun = False
+  for line in lines:
+    # Strip out comments
+    if line.find("//") > 0:
+      line = line[:line.find("//")]
+
+    # look for "synchronized void run()"
+    if re.search("synchronized (.*) run[\ (]", line):
+      #logger.debug("Disallowed mutant detected (case 1):")
+      #logger.debug("\n{}".format(line))
+      return True
+
+    # This is a crude way to look for
+    # public void run(){
+    #   ...
+    #   synchronized
+    #   ...
+    #   }
+    # The only condition is that synchronized appears before ANY closing
+    # bracket, "}""
+
+    if re.search("[\ ]run[\ (]", line):
+      inRun = True
+
+    if re.search("synchronized", line) and inRun:
+      #logger.debug("Disallowed mutant detected (case 2):")
+      #logger.debug("\n{}".format(line))
+      return True
+
+    if re.search("[\}+]", line) and inRun:
+      inRun = False
+
+  return False
+
+
+# Important note: The src/_evolution/test_remove_multi_synch subdirectory
+#                 contains a test program for the regular expressions below.
+#                 See remove-multi-synch.py for details.
+
+def check_double_synch(generation, memberNum, txlOperator, mutantNum):
+  synchStack = list()
+  doubleSynchFound = False
+
+  javaFile = uniqueMutants[(generation, memberNum, txlOperator, mutantNum)]
+  #logger.debug("Java file: {}".format(javaFile))
+
+  with open(javaFile) as f:
+    lines = f.read().splitlines()
+
+  for line in lines:
+    # Strip out comments
+    if line.find("//") > 0:
+      line = line[:line.find("//")]
+
+    # Look for a synchronization variable. If found, add it to the stack
+    synchVar = re.search("synchronized \((\S+)\)", line)
+    if synchVar is not None:
+      #logger.debug("Synch var {}".format(synchVar.group(1)))
+      if synchVar.group(1) in synchStack:
+        doubleSynchFound = True
+        #logger.debug("Double synchronization found in file {} on variable {}"\
+        #  .format(javaFile, synchVar.group(1)))
+      else:
+        synchStack.append(synchVar.group(1))
+
+      # When we find a closing curly brace, we pop the stack
+      if line.find("}") > 0 and len(synchStack) > 0:
+        synchStack.pop()
+
+  return doubleSynchFound

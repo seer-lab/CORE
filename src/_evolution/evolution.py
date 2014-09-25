@@ -1,7 +1,7 @@
-"""This module will start the evolution process for CORE.
+"""This module starts the evolution process for CORE.
 
 Copyright ARC, David Kelk and Kevin Jalbert, 2012
-          ARC, CORE, David Kelk, 2013
+          ARC, CORE, CORE-INC, David Kelk, 2013
 """
 
 from __future__ import division
@@ -193,6 +193,22 @@ def start():
     #    of the population.")
     # logger.info("(Scroll up)")
 
+    # Notify the user if the solution found synchronizes run()
+    # If so, let them know about the _EXCLUDE_RUN option
+    outDir = os.path.join(config._PROJECT_OUTPUT_DIR,
+      config._PROJECT_SRC_DIR.replace(config._PROJECT_DIR, ''))
+    logger.debug("Checking if run was synchronized for the output project:")
+    logger.debug("{}".format(outDir))
+    if os.path.exists(outDir) and txl_operator.was_run_synchronized(outDir):
+      logger.info("------------------------------------------------------")
+      logger.info("Note that the solution found synchronizes run(). This ")
+      logger.info("turned your (potentially fixed) program into a sequential")
+      logger.info("one. There are two things you should consider doing:")
+      logger.info("1. Consider re-designing your parallel code, or")
+      logger.info("2. Use the `_EXCLUDE_RUN = True' option in config.py")
+      logger.info("   to prevent CORE from synchronizing run in the future.")
+      logger.info("------------------------------------------------------")
+
   except:
     logger.error("evolution.start: Unexpected error:\n", \
       traceback.print_exc(file=sys.stdout))
@@ -211,6 +227,7 @@ def start():
         sourceDir = os.path.join(config._TMP_DIR, str(gen), str(mem), "source")
         if os.path.isdir(sourceDir):
           send2trash(sourceDir)
+
 
 def evolve(generation=0, worstScore=0):
   """This function is the workhorse for CORE: Both the fixing and
@@ -307,14 +324,14 @@ def evolve(generation=0, worstScore=0):
 
     # Check for ending conditions
 
-    # 1. If the fitness doesn't improve over N generations during the
-    #    optimization phase, we stop
+    # If the fitness doesn't improve over N generations during the
+    # optimization phase, we stop
     if not _functionalPhase and convergence(generation, bestFitness, averageFitness):
       logger.debug("Returning the best individual found so far.")
       return get_best_individual()
 
-    # 2. No compilable projects were generated for any members during the fixing
-    #    phase.
+    # No compilable projects were generated for any members during the fixing
+    # phase.
     if not moreMutations:
       logger.info("No compilable projects were generated for any member of")
       logger.info("the population at generation {}. This is very odd.".format(generation))
@@ -324,7 +341,7 @@ def evolve(generation=0, worstScore=0):
     # Update heuristics (Weighting, ...) if the search isn't random
     if not config._RANDOM_MUTATION:
 
-      # 1. If members of the population underperform for too long, we replace them
+      # If members of the population underperform for too long, we replace them
       # with either the
       # - pristine project (phase 1) or pristine fixed project (phase 2), or
       # - highest fitness project found in the phase so far
@@ -346,7 +363,7 @@ def evolve(generation=0, worstScore=0):
             logger.debug("Returning the best individual found so far.")
             return get_best_individual()
 
-      # 2. Adjust weighting of mutation operators
+      # Adjust weighting of mutation operators
       deadlockVotes, dataraceVotes, OptimizationVotes = adjust_operator_weighting(generation)
 
 
@@ -359,9 +376,10 @@ def mutation(individual, deadlockVotes, dataraceVotes, OptimizationVotes):
       Votes by operator type, eg: ({'ASAT': 1}) See the operator_weighting fn
 
   Returns:
-    boolean: Functional: Was a compilable mutated project created for the
-                         individual?
-             Optimization: Were any mutants created for the individual?
+    boolean:
+      Functional phase: Was a compilable mutated project created for
+        the individual?
+      Optimization phase: Were any mutants created for the individual?
   """
 
   global _functionalPhase
@@ -469,7 +487,9 @@ def mutation(individual, deadlockVotes, dataraceVotes, OptimizationVotes):
     keepTrying = True
     innerLoopCtr = 0
     while keepTrying:
+      # int
       randomMutant = random.randint(0, len(individual.genome[operatorIndex]) - 1)
+      #logger.debug("Random mutant: {}".format(randomMutant))
 
       # Make sure we try a new mutation
       if randomMutant not in attemptedMutations[operatorIndex]:
@@ -489,6 +509,24 @@ def mutation(individual, deadlockVotes, dataraceVotes, OptimizationVotes):
     # When we get here, we have selected a new mutant to try
     totTriedMutants += 1
 
+    # Now we check for reasons to exclude a mutant file:
+
+    # 1. If we are excluding run as a synchronizable method, check the selected
+    # mutant for it
+    if hasattr(config, '_EXCLUDE_RUN'):
+      if config._EXCLUDE_RUN:
+        if txl_operator.check_synch_run(individual.generation, individual.id,
+          selectedOperator[0], randomMutant + 1):
+          continue
+
+    # 2. Double locking on a variable isn't allowed:
+    # removed the if...: for testing
+    if txl_operator.check_double_synch(individual.generation, individual.id,
+      selectedOperator[0], randomMutant + 1):
+      continue
+
+    # We wipe out the entire project and start again because we don't want
+    # the previous mutation
     txl_operator.create_local_project(individual.generation, individual.id, False)
     txl_operator.move_mutant_to_local_project(individual.generation, individual.id,
                                               selectedOperator[0], randomMutant + 1)
@@ -750,8 +788,8 @@ def evaluate(individual, generation):
   # If the mutant isn't a repeat, add it to the hash list of seen
   # mutants and continue with the evaluation
   if hashVal != None and _functionalPhase:
-    logger.debug("Didn't find this mutated project hash in hash list: {}. \
-      Adding it".format(hashVal))
+    #logger.debug("Didn't find this mutated project hash in hash list: {}. \
+    #  Adding it".format(hashVal))
     hashlist.add_hash(hashVal, individual.generation, individual.id)
 
   if _functionalPhase and _useJPF:
@@ -815,6 +853,14 @@ def evaluate_modelcheck(individual, generation):
       logger.error("collected. This mutant will be evaluated by ConTest.")
       return True
 
+    # Sometimes the stats array is full of 0s. Ie, the number of visited
+    # states = 0, number of end states  = 0, etc...
+    if stats[1] == 0 and stats[2] == 0:
+      logger.error("JPF ran, but the statistics generated don't make sense.")
+      logger.error("The number of visited states is 0. The number of end")
+      logger.error("states is 0. This mutant will be evaluated by ConTest.")
+      return True
+
     issueTxt = run_jpf.checkForKnownIssues()
     if issueTxt is not None and issueTxt is "attemptNullObjectLock":
       logger.error("We've generated a mutant that locks on an object before it")
@@ -862,7 +908,8 @@ def evaluate_modelcheck(individual, generation):
     maxFitness = config._CONTEST_RUNS * config._SUCCESS_WEIGHT
     logger.debug("Max fitness: {}".format(maxFitness))
 
-    # Deep breath. If we've made it this far, we can attempt to make sense of the results
+    # Deep breath. If we've made it this far, we can attempt to make sense
+    # of the results
 
     if depthLimitReached and (raceFound or lockFound):
       logger.debug("We've reached the configured depth limit, {}." \
@@ -964,6 +1011,7 @@ def evaluate_contest(individual):  #, worstScore):
 
   individual.evalMethod.append('ConTest')
 
+  # Bug fixing phase
   if _functionalPhase:
 
     contest.begin_testing(_functionalPhase, False)
@@ -980,7 +1028,7 @@ def evaluate_contest(individual):  #, worstScore):
     individual.errors.append(contest.errors)
 
 
-  # Non-functional phase
+  # Optimization phase
   else:
     # Ensure functionality is still there
     if contest.begin_testing(_functionalPhase, True, config._CONTEST_RUNS *
@@ -1041,20 +1089,20 @@ def check_repeat_mutant(individual):
 
   hashGen, hashMem =  hashlist.find_hash(md5Hash)
   if hashGen == None or hashMem == None:
-    logger.debug("Hash value of member {}, generation {} not found".format(
-      individual.id, individual.generation))
+    #logger.debug("Hash value of member {}, generation {} not found".format(
+    #  individual.id, individual.generation))
     return False, md5Hash
 
   # If we have, we can skip the evaluation (saves time) and copy the testing
   # results from the first mutant
-  logger.debug("This is the same as generation {}, member {}.  Skipping \
-    evaluation".format(hashGen, hashMem))
+  #logger.debug("This is the same as generation {}, member {}.  Skipping \
+  #  evaluation".format(hashGen, hashMem))
   prevIndvidual = _population[hashMem]
 
-  logger.debug("hashGen  : {}".format(hashGen))
-  logger.debug("Score    : {}".format(prevIndvidual.score))
-  logger.debug("Successes: {}".format(prevIndvidual.successes))
-  logger.debug("Timeouts : {}".format(prevIndvidual.timeouts))
+  #logger.debug("hashGen  : {}".format(hashGen))
+  #logger.debug("Score    : {}".format(prevIndvidual.score))
+  #logger.debug("Successes: {}".format(prevIndvidual.successes))
+  #logger.debug("Timeouts : {}".format(prevIndvidual.timeouts))
 
   # Copy the testing information into the individual
   individual.score.append(prevIndvidual.score[-1])

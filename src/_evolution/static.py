@@ -30,7 +30,7 @@ logger = logging.getLogger('output-log')
 # improved by finding which ones are used concurrently. There are different
 # tools that can do this - like Chord, a static analysis tool and ConTest,
 # which we use for noising. Different tools return different information -
-# like the Class and variable used concurrently or the class and method
+# like the class and variable used concurrently or the class and method
 # used concurrently.
 # This file contains methods to collect the classes, methods and variables
 # found with the ultimate goal of producing a list of (class, method,
@@ -49,7 +49,7 @@ _classMethVar = []
 # Locking on primitive types (int, float, bool, ...) isn't allowed in
 # Java. The analysis in this unit return all shared variables, including
 # primitives. Removing them from the lists has multiple benefits: Less
-# mutants generated (hard drive space, file IO is slow) and is
+# mutants generated (hard drive space, file IO is slow) and it is
 # faster (mutant generation, compile time).
 _primitiveVars = []
 
@@ -326,7 +326,7 @@ def add_JPF_race_list(JPFlist):
         tempTuple = (aTuple[-2].split("$")[-2], aTuple[-1])
         aTuple = tempTuple
       _classMeth.append(aTuple)
-      logger.debug("{} is new. Adding it to _classMeth.".format(aTuple))
+      #logger.debug("{} is new. Adding it to _classMeth.".format(aTuple))
     #else:
     #  logger.debug("{} is already in _classMeth".format(aTuple))
 
@@ -357,7 +357,7 @@ def add_JPF_lock_list(JPFList):
 
   create_final_triple()
 
-# ------------ Database of Static Analysis ---------------
+# ------------ Static analysis database file ---------------
 
 def find_static_in_db(projectName):
   """Look in src/staticDB.txt to see if the static analysis of this project
@@ -441,7 +441,7 @@ def eliminate_primitives():
       _classMethVar.remove(aTuple)
 
 
-# Important note: The src/_evolution/primitive_tester subdirectory contains
+# Important note: The src/_evolution/test_primitive subdirectory contains
 #                 a test program for the regular expressions below. See
 #                 primitive-tester.py for details.
 
@@ -461,26 +461,31 @@ def search_files_for_primitives(primTuple):
         lines = fileHnd.read().splitlines()
 
       for line in lines:
-        if line.find("//"):
+        if line.find("//") > 0:
           line = line[:line.find("//")]
         aTuple = None
         primVar = primTuple[-1]
         # Someone with a better knowledge of regular expressions should rewrite
         # this. See also primitive_tester/primitive-tester.py
-        if re.search("int .* (" + primVar + ")(?!\[)(?!\.)", line) is not None \
-          or re.search("int (" + primVar + ")(?!\[)(?!\.)", line) is not None \
-          or re.search("boolean .* (" + primVar + ")(?!\[)(?!\.)", line) is not None \
-          or re.search("boolean (" + primVar + ")(?!\[)(?!\.)", line) is not None \
-          or re.search("long .* (" + primVar + ")(?!\[)(?!\.)", line) is not None \
-          or re.search("long (" + primVar + ")(?!\[)(?!\.)", line) is not None \
-          or re.search("float .* (" + primVar + ")(?!\[)(?!\.)", line) is not None \
-          or re.search("float (" + primVar + ")(?!\[)(?!\.)", line) is not None \
-          or re.search("double .* (" + primVar + ")(?!\[)(?!\.)", line) is not None \
-          or re.search("double (" + primVar + ")(?!\[)(?!\.)", line) is not None \
-          or re.search("char .* (" + primVar + ")(?!\[)(?!\.)", line) is not None \
-          or re.search("char (" + primVar + ")(?!\[)(?!\.)", line) is not None \
-          or re.search("short .* (" + primVar + ")(?!\[)(?!\.)", line) is not None \
-          or re.search("short (" + primVar + ")(?!\[)(?!\.)", line) is not None:
+        if   re.search("int (.*) (" + primVar + ")(?!\[)(?!\.)(?![a-zA-Z0-9])", line) is not None \
+          or re.search("int (" + primVar + ")(?!\[)(?!\.)(?![a-zA-Z0-9])", line) is not None \
+          or re.search("boolean .* (" + primVar + ")(?!\[)(?!\.)(?![a-zA-Z0-9])", line) is not None \
+          or re.search("boolean (" + primVar + ")(?!\[)(?!\.)(?![a-zA-Z0-9])", line) is not None \
+          or re.search("string .* (" + primVar + ")(?!\[)(?!\.)(?![a-zA-Z0-9])", line) is not None \
+          or re.search("string (" + primVar + ")(?!\[)(?!\.)(?![a-zA-Z0-9])", line) is not None \
+          or re.search("long .* (" + primVar + ")(?!\[)(?!\.)(?![a-zA-Z0-9])", line) is not None \
+          or re.search("long (" + primVar + ")(?!\[)(?!\.)(?![a-zA-Z0-9])", line) is not None \
+          or re.search("float .* (" + primVar + ")(?!\[)(?!\.)(?![a-zA-Z0-9])", line) is not None \
+          or re.search("float (" + primVar + ")(?!\[)(?!\.)(?![a-zA-Z0-9])", line) is not None \
+          or re.search("double .* (" + primVar + ")(?!\[)(?!\.)(?![a-zA-Z0-9])", line) is not None \
+          or re.search("double (" + primVar + ")(?!\[)(?!\.)(?![a-zA-Z0-9])", line) is not None \
+          or re.search("char .* (" + primVar + ")(?!\[)(?!\.)(?![a-zA-Z0-9])", line) is not None \
+          or re.search("char (" + primVar + ")(?!\[)(?!\.)(?![a-zA-Z0-9])", line) is not None \
+          or re.search("short .* (" + primVar + ")(?!\[)(?!\.)(?![a-zA-Z0-9])", line) is not None \
+          or re.search("short (" + primVar + ")(?!\[)(?!\.)(?![a-zA-Z0-9])", line) is not None:
+          #logger.debug("{} was found to be of primitive type on line".format(primVar))
+          #logger.debug("{}".format(line))
+          #logger.debug("in file {}".format(aFile))
           aTuple = primTuple
 
         if aTuple is None:
@@ -497,8 +502,8 @@ def search_files_for_primitives(primTuple):
 
 def is_variable_primitive(thisVar):
   for aTuple in _primitiveVars:
-    logger.debug("Comparing primitive {} to {}".format(aTuple[-1], thisVar[-1]))
-    logger.debug("For tuples {} and {}".format(aTuple, thisVar))
+    #logger.debug("Comparing primitive {} to {}".format(aTuple[-1], thisVar[-1]))
+    #logger.debug("For tuples {} and {}".format(aTuple, thisVar))
     if aTuple[-1] is thisVar[-1]:
       return True
 

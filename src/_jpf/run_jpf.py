@@ -48,10 +48,9 @@ def createGateway(individualID, generation):
       + ":" + config._PY4J_JAR, 'launchJPF.java'], stdout=outFile,
       stderr=errFile, cwd=config._JPF_DIR, shell=False)
     process.wait()
-    #+ ":" + os.path.join(CONFIG._ROOT_DIR, "/lib/JPF/build/jpf-annotations.jar")
-    #+ ":" + os.path.join(CONFIG._ROOT_DIR, "/lib/JPF/build/jpf-classes.jar")
 
     # Debugging
+    #
     # outFile.seek(0)
     # errFile.seek(0)
     # output = outFile.read()
@@ -111,21 +110,20 @@ def runJPF():
   jpfConfig[0] = config._JPF_CONFIG  # The .jpf file
   jpfConfig[1] = '+classpath=' + config._PROJECT_CLASS_DIR
   jpfConfig[2] = '+sourcepath=' + config._PROJECT_SRC_DIR
-  jpfConfig[3] = '+search.class = gov.nasa.jpf.search.heuristic.BFSHeuristic'
-  jpfConfig[4] = '+search.depth_limit = ' + str(config._JPF_SEARCH_DEPTH)
-  jpfConfig[5] = '+listener = gov.nasa.jpf.listener.BudgetChecker,'
-  jpfConfig[6] = '+budget.max_time = ' + str(config._JPF_SEARCH_TIME_SEC * 1000)
-  jpfConfig[7] = '+log.level = info'
-  jpfConfig[8] = '+log.output = jpfLog.txt'
-  jpfConfig[9] = '+log.info = jpfLog' # Matches launchJPF.java
-
+  jpfConfig[3] = '+search.class=gov.nasa.jpf.search.heuristic.BFSHeuristic'
+  jpfConfig[4] = '+search.depth_limit=' + str(config._JPF_SEARCH_DEPTH)
+  jpfConfig[5] = '+log.level=info'
+  jpfConfig[6] = '+log.output=jpfLog.txt'
+  jpfConfig[7] = '+log.info=jpfLog' # Matches launchJPF.java
+  jpfConfig[8] = '+listener=gov.nasa.jpf.listener.BudgetChecker,'
+  jpfConfig[9] = '+budget.max_time=' + str(config._JPF_SEARCH_TIME_SEC * 1000)
   # Invoke JPF through the gateway
   logger.debug("Running JPF.")
   _jpfLauncher.setArgs(jpfConfig)
 
   try:
     _jpfLauncher.runJPF()
-  except Py4JJavaError, pyExc: #py4j.protocol.Py4JJavaError, pyExc:
+  except Py4JJavaError, pyExc:
     logger.error("Encountered a py4j.protocol.Py4JJavaError.")
     logger.error(str(pyExc))
   except:
@@ -149,7 +147,6 @@ def shutdownJPFProcess():
 
   _jpfProcess.send_signal(3)
   time.sleep(1)
-  #_jpfProcess.terminate()
   _jpfProcess.kill()
 
 

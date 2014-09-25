@@ -5,7 +5,7 @@ the capabilities to have a variable width for each row. In addition, there are
 specific attributes used in the CORE evolutionary process.
 
 Copyright ARC, David Kelk and Kevin Jalbert, 2012
-          ARC, CORE, David Kelk, 2013
+          ARC, CORE, CORE-INC, David Kelk, 2013
 """
 
 from _txl import txl_operator

@@ -1,5 +1,4 @@
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.logging.*;
 import java.util.*;
 
 // JPF libraries are in core/lib/JPF/
@@ -45,10 +44,20 @@ public class launchJPF {
 
       myJPF = new JPF(conf);
 
+      // Note:
+      //   myJPF.addListener(...);   Doesn't work
+      //   Adding a listener to one of the search list or vm list doesn't
+      //   work. They have to be in both. TODO: Investigate this
+
+
+      // ----- Incremental listener
+      //jpfIncrementalMake = new IncrementalMake(conf, myJPF);
+      //myJPF.addSearchListener(jpfIncrementalMake);
+      //myJPF.addVMListener(jpfIncrementalMake);
+
       // ----- Data-race listener
       jpfRaceDetector = new PreciseRaceDetector(conf);
       conf.setProperty("report.console.property_violation", "error");
-      // Listener needs to be on both lists to work right
       myJPF.addSearchListener(jpfRaceDetector);
       myJPF.addVMListener(jpfRaceDetector);
 
@@ -57,12 +66,6 @@ public class launchJPF {
       conf.setProperty("deadlock.format", "essential");
       myJPF.addSearchListener(jpfDeadlockAn);
       myJPF.addVMListener(jpfDeadlockAn);
-
-      // ----- Budget Checker
-      //jpfBudgetChecker = new BudgetChecker(conf, myJPF);
-      //conf.setProperty("+budget.max_time", "1000");
-      //myJPF.addSearchListener(jpfBudgetChecker);
-      //myJPF.addVMListener(jpfBudgetChecker);
 
       log.info("Starting JPF run");
       myJPF.run();

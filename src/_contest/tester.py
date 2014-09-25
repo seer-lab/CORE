@@ -71,7 +71,6 @@ class Tester():
     while self.errors + self.successes + self.dataraces + self.deadlocks \
       + self.timeouts < runs:
       i += 1
-    #for i in range(1, runs + 1):
 
       # To ensure stdout doesn't overflow because .poll() can deadlock
       outFile = tempfile.SpooledTemporaryFile()
